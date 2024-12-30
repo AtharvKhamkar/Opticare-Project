@@ -1,0 +1,14 @@
+[
+  {
+    "relations": [
+      "delegrate_permission/common.handle_all_urls"
+    ],
+    "targets": {
+      "namespace": "android_app",
+      "package_name": "com.vizzhy.iottest",
+      "sha256_cert_fingerprints": [
+        "D1:79:94:ED:52:80:48:5E:DD:9C:85:EC:75:35:10:8D:A0:A7:B8:9B:38:07:6D:83:FC:79:E1:32:02:E7:60:0F"
+      ]
+    }
+  }
+]

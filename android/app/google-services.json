@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "161045405457",
+    "project_id": "vizzhydev-2a71b",
+    "storage_bucket": "vizzhydev-2a71b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:161045405457:android:79c3045ed8864289b9f6b0",
+        "android_client_info": {
+          "package_name": "com.vizzhy.iottest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJDc8sm3gF9ZOXl0AE5ltDIaQRfaoWUpk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,2 @@
+Pods/TerraRTiOS/TerraRTiOS.xcframework/ios-arm64/TerraRTiOS.framework/TerraRTiOS
+./Pods/TerraRTiOS/TerraRTiOS.xcframework/ios-arm64/TerraRTiOS.framework/TerraRTiOS

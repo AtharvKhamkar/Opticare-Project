@@ -1,0 +1,2191 @@
+// TerraManager.java
+package co.tryterra.terra;
+
+import android.annotation.SuppressLint;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.provider.Settings.Secure;
+import android.util.Log;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContract;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.health.connect.client.HealthConnectClient;
+import androidx.health.connect.client.PermissionController;
+import androidx.work.Constraints;
+import androidx.work.Data;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.OutOfQuotaPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+import co.tryterra.terra.backend.models.TerraActivityDataPayload;
+import co.tryterra.terra.backend.models.TerraBodyDataPayload;
+import co.tryterra.terra.backend.models.TerraDailyDataPayload;
+import co.tryterra.terra.backend.models.TerraErrorResponse;
+import co.tryterra.terra.backend.models.TerraNutritionDataPayload;
+import co.tryterra.terra.backend.models.TerraSleepDataPayload;
+import co.tryterra.terra.backend.models.TerraUser;
+import co.tryterra.terra.backend.models.TerraWebhookResponse;
+import co.tryterra.terra.enums.Connections;
+import co.tryterra.terra.enums.CustomPermissions;
+import co.tryterra.terra.enums.DataTypes;
+import co.tryterra.terra.enums.Permissions;
+import co.tryterra.terra.fsl.FSLSensor;
+import co.tryterra.terra.fsl.models.FSLSensorDetails;
+import co.tryterra.terra.healthconnect.HCPermissions;
+import co.tryterra.terra.healthconnect.HealthConnect;
+import co.tryterra.terra.healthconnect.ScheduleMimic;
+import co.tryterra.terra.models.InitUserModel;
+import co.tryterra.terra.models.InitialiseSDKModel;
+import co.tryterra.terra.models.Users;
+import co.tryterra.terra.sensors.StepWorker;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import kotlin.Metadata;
+import kotlin.NoWhenBranchMatchedException;
+import kotlin.Pair;
+import kotlin.ResultKt;
+import kotlin.TuplesKt;
+import kotlin.Unit;
+import kotlin.collections.CollectionsKt;
+import kotlin.collections.MapsKt;
+import kotlin.collections.SetsKt;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function2;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.DefaultConstructorMarker;
+import kotlin.jvm.internal.Intrinsics;
+import kotlinx.coroutines.BuildersKt;
+import kotlinx.coroutines.CompletableJob;
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.CoroutineStart;
+import kotlinx.coroutines.ExecutorsKt;
+import kotlinx.coroutines.Job;
+import kotlinx.coroutines.JobKt;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 1,
+   xi = 48,
+   d1 = {"\u0000´\u0001\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000e\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0010\u000b\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\t\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0010\"\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u000b\n\u0002\u0018\u0002\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\b\u0007\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\u0018\u0000 Z2\u00020\u0001:\u0002YZB?\b\u0002\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005\u0012\n\b\u0002\u0010\u0006\u001a\u0004\u0018\u00010\u0003\u0012\u001a\u0010\u0007\u001a\u0016\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\b¢\u0006\u0002\u0010\fJ \u0010-\u001a\u00020\u000b2\u0018\u0010\u0007\u001a\u0014\u0012\n\u0012\b\u0012\u0004\u0012\u00020\u00030\u001b\u0012\u0004\u0012\u00020\u000b0.J\"\u0010/\u001a\u00020\u000b2\u0006\u00100\u001a\u0002012\u0012\u00102\u001a\u000e\u0012\u0004\u0012\u00020\t\u0012\u0004\u0012\u00020\u000b0.J\b\u00103\u001a\u00020\u000bH\u0002JN\u00104\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u0002072\u0006\u00108\u001a\u0002072\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u00104\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u00020\u000e2\u0006\u00108\u001a\u00020\u000e2\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:J$\u0010<\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0014\b\u0002\u0010\u0007\u001a\u000e\u0012\u0004\u0012\u00020\t\u0012\u0004\u0012\u00020\u000b0.JN\u0010=\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u0002072\u0006\u00108\u001a\u0002072\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010=\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u00020\u000e2\u0006\u00108\u001a\u00020\u000e2\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010>\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u0002072\u0006\u00108\u001a\u0002072\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010>\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u00020\u000e2\u0006\u00108\u001a\u00020\u000e2\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010?\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u0002072\u0006\u00108\u001a\u0002072\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010?\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u00020\u000e2\u0006\u00108\u001a\u00020\u000e2\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010@\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u0002072\u0006\u00108\u001a\u0002072\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:JN\u0010@\u001a\u00020\u000b2\u0006\u00105\u001a\u0002012\u0006\u00106\u001a\u00020\u000e2\u0006\u00108\u001a\u00020\u000e2\b\b\u0002\u00109\u001a\u00020\t2$\b\u0002\u0010\u0007\u001a\u001e\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010;\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0:J\u0010\u0010A\u001a\u0004\u0018\u00010\u00032\u0006\u00105\u001a\u000201J\u0010\u0010B\u001a\u00020\n2\u0006\u0010C\u001a\u00020\u0003H\u0002Jb\u0010D\u001a\u00020\u000b2\u0006\u00100\u001a\u0002012\u0006\u0010E\u001a\u00020\u00032\u0006\u0010\u0004\u001a\u00020\u00052\u000e\b\u0002\u0010F\u001a\b\u0012\u0004\u0012\u00020G0\u001b2\b\b\u0002\u0010H\u001a\u00020\t2\n\b\u0002\u0010I\u001a\u0004\u0018\u00010\u00032\u001c\b\u0002\u0010\u0007\u001a\u0016\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\bJT\u0010J\u001a\u00020\u000b2\b\u0010K\u001a\u0004\u0018\u00010\u00032\b\u0010E\u001a\u0004\u0018\u00010\u00032\u0006\u0010\u0004\u001a\u00020\u00052\b\u0010I\u001a\u0004\u0018\u00010\u00032\b\u0010L\u001a\u0004\u0018\u00010M2\u001a\u0010\u0007\u001a\u0016\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\bH\u0002Jn\u0010N\u001a\u00020\u000b2\b\u0010K\u001a\u0004\u0018\u00010\u00032\u0006\u0010O\u001a\u00020\u00032\b\u0010E\u001a\u0004\u0018\u00010\u00032\u0006\u0010\u0004\u001a\u00020\u00052\f\u0010!\u001a\b\u0012\u0004\u0012\u00020\"0\u001b2\f\u0010F\u001a\b\u0012\u0004\u0012\u00020G0\u001b2\b\u0010L\u001a\u0004\u0018\u00010M2\u001a\u0010\u0007\u001a\u0016\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\bH\u0002JI\u0010P\u001a\u00020\u000b\"\u0006\b\u0000\u0010Q\u0018\u00012\u0006\u0010R\u001a\u00020\u00032\u0006\u0010O\u001a\u00020\u00032\u0006\u0010S\u001a\u00020\u00032\u001e\b\u0004\u0010\u0007\u001a\u0018\u0012\u0006\u0012\u0004\u0018\u0001HQ\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\bH\u0082\bJ\u001c\u0010T\u001a\u00020\u000b2\u0014\u0010\u0007\u001a\u0010\u0012\u0006\u0012\u0004\u0018\u00010U\u0012\u0004\u0012\u00020\u000b0.J\u0014\u0010V\u001a\u00020\u000b2\f\u0010W\u001a\b\u0012\u0004\u0012\u00020X0\u001bR\u000e\u0010\r\u001a\u00020\u000eX\u0082\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\u000f\u001a\u00020\u000eX\u0082\u000e¢\u0006\u0002\n\u0000R%\u0010\u0007\u001a\u0016\u0012\u0004\u0012\u00020\t\u0012\u0006\u0012\u0004\u0018\u00010\n\u0012\u0004\u0012\u00020\u000b0\b¢\u0006\b\n\u0000\u001a\u0004\b\u0010\u0010\u0011R\u000e\u0010\u0004\u001a\u00020\u0005X\u0082\u0004¢\u0006\u0002\n\u0000R\u0014\u0010\u0012\u001a\u00020\u00138VX\u0096\u0004¢\u0006\u0006\u001a\u0004\b\u0014\u0010\u0015R\u000e\u0010\u0016\u001a\u00020\u000eX\u0082\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\u0002\u001a\u00020\u0003X\u0082\u0004¢\u0006\u0002\n\u0000R\u0010\u0010\u0017\u001a\u0004\u0018\u00010\u0018X\u0082\u000e¢\u0006\u0002\n\u0000R\u001c\u0010\u0019\u001a\u0010\u0012\n\u0012\b\u0012\u0004\u0012\u00020\u00030\u001b\u0018\u00010\u001aX\u0082\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\u001c\u001a\u00020\u001dX\u0082\u0004¢\u0006\u0002\n\u0000R\u0010\u0010\u001e\u001a\u0004\u0018\u00010\u001fX\u0082\u0004¢\u0006\u0002\n\u0000R\u000e\u0010 \u001a\u00020\u000eX\u0082\u000e¢\u0006\u0002\n\u0000R\u0014\u0010!\u001a\b\u0012\u0004\u0012\u00020\"0\u001bX\u0082.¢\u0006\u0002\n\u0000R\u0016\u0010#\u001a\n %*\u0004\u0018\u00010$0$X\u0082\u0004¢\u0006\u0002\n\u0000R\u0013\u0010\u0006\u001a\u0004\u0018\u00010\u0003¢\u0006\b\n\u0000\u001a\u0004\b&\u0010'R\u0016\u0010(\u001a\n %*\u0004\u0018\u00010)0)X\u0082\u0004¢\u0006\u0002\n\u0000R\u000e\u0010*\u001a\u00020\u000eX\u0082\u000e¢\u0006\u0002\n\u0000R\u001c\u0010+\u001a\n %*\u0004\u0018\u00010\u00030\u00038CX\u0082\u0004¢\u0006\u0006\u001a\u0004\b,\u0010'¨\u0006["},
+   d2 = {"Lco/tryterra/terra/TerraManager;", "Lkotlinx/coroutines/CoroutineScope;", "devId", "", "context", "Landroid/content/Context;", "referenceId", "completion", "Lkotlin/Function2;", "", "Lco/tryterra/terra/TerraError;", "", "(Ljava/lang/String;Landroid/content/Context;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V", "activityTimer", "", "bodyTimer", "getCompletion", "()Lkotlin/jvm/functions/Function2;", "coroutineContext", "Lkotlin/coroutines/CoroutineContext;", "getCoroutineContext", "()Lkotlin/coroutines/CoroutineContext;", "dailyTimer", "healthConnect", "Lco/tryterra/terra/healthconnect/HealthConnect;", "healthConnectPermissionContract", "Landroidx/activity/result/ActivityResultLauncher;", "", "job", "Lkotlinx/coroutines/CompletableJob;", "manager", "Landroid/app/NotificationManager;", "nutritionTimer", "permissions", "Lco/tryterra/terra/enums/Permissions;", "preferences", "Landroid/content/SharedPreferences;", "kotlin.jvm.PlatformType", "getReferenceId", "()Ljava/lang/String;", "singleThreadExecutor", "Ljava/util/concurrent/ExecutorService;", "sleepTimer", "uniqueId", "getUniqueId", "allGivenPermissions", "Lkotlin/Function1;", "checkAuth", "connection", "Lco/tryterra/terra/enums/Connections;", "callback", "executeSubscriptionQueries", "getActivity", "type", "startDate", "Ljava/util/Date;", "endDate", "toWebhook", "Lkotlin/Function3;", "Lco/tryterra/terra/backend/models/TerraDataPayload;", "getAthlete", "getBody", "getDaily", "getNutrition", "getSleep", "getUserId", "handleInitConnectionError", "message", "initConnection", "token", "customPermissions", "Lco/tryterra/terra/enums/CustomPermissions;", "schedulerOn", "startIntent", "initFreeStyleLibre", "userId", "latch", "Ljava/util/concurrent/CountDownLatch;", "initHealthConnect", "resource", "normalizeData", "T", "data", "datatype", "readGlucoseData", "Lco/tryterra/terra/fsl/models/FSLSensorDetails;", "subscribe", "forDataTypes", "Lco/tryterra/terra/enums/DataTypes;", "BaseResponse", "Companion", "TerraAndroid_release"}
+)
+public final class TerraManager implements CoroutineScope {
+   @NotNull
+   public static final Companion Companion = new Companion((DefaultConstructorMarker)null);
+   @NotNull
+   private final String devId;
+   @NotNull
+   private final Context context;
+   @Nullable
+   private final String referenceId;
+   @NotNull
+   private final Function2 completion;
+   private long activityTimer;
+   private long dailyTimer;
+   private long bodyTimer;
+   private long sleepTimer;
+   private long nutritionTimer;
+   private final SharedPreferences preferences;
+   @NotNull
+   private final CompletableJob job;
+   private final ExecutorService singleThreadExecutor;
+   @Nullable
+   private HealthConnect healthConnect;
+   private Set permissions;
+   @Nullable
+   private ActivityResultLauncher healthConnectPermissionContract;
+   @Nullable
+   private final NotificationManager manager;
+   @NotNull
+   private static final String TAG = "TerraManager";
+   @NotNull
+   public static final String TERRA_PREFS = "co.tryterra.terra.prefs";
+   @NotNull
+   private static ArrayList users = new ArrayList();
+   @NotNull
+   private static AtomicBoolean sensorScanning = new AtomicBoolean(false);
+   @NotNull
+   private static final ActivityResultContract permissionLauncher;
+   @NotNull
+   private static Set grantedPermissions;
+
+   private TerraManager(String devId, Context context, String referenceId, Function2 completion) {
+      this.devId = devId;
+      this.context = context;
+      this.referenceId = referenceId;
+      this.completion = completion;
+      this.activityTimer = 1200000L;
+      this.dailyTimer = 28800000L;
+      this.bodyTimer = 28800000L;
+      this.sleepTimer = 28800000L;
+      this.nutritionTimer = 28800000L;
+      this.preferences = this.context.getSharedPreferences("co.tryterra.terra.prefs", 0);
+      this.job = JobKt.Job$default((Job)null, 1, (Object)null);
+      this.singleThreadExecutor = Executors.newFixedThreadPool(5);
+      Object var5 = this.context.getSystemService("notification");
+      this.manager = var5 instanceof NotificationManager ? (NotificationManager)var5 : null;
+      NotificationChannel channel = new NotificationChannel("co.tryterra.terra.notification", (CharSequence)"Scheduler Service", 2);
+      NotificationManager var10000 = this.manager;
+      if (var10000 != null) {
+         var10000.createNotificationChannel(channel);
+      }
+
+      Context var6 = this.context;
+      if ((var6 instanceof AppCompatActivity ? (AppCompatActivity)var6 : null) != null) {
+         try {
+            this.healthConnectPermissionContract = ((AppCompatActivity)this.context).registerForActivityResult(permissionLauncher, TerraManager::_init_$lambda-0);
+         } catch (IllegalStateException var8) {
+            Log.e("TerraManager", "Attempt to call on resumed state");
+         }
+      }
+
+      HTTPRequestClient.Builder var10 = (new HTTPRequestClient.Builder()).setUrl("https://api.tryterra.co/v2/auth/initSDK?resource_user_identifier=" + this.getUniqueId()).withInput(InitialiseSDKModel.class);
+      Pair[] var7 = new Pair[]{TuplesKt.to("dev-id", this.devId)};
+      HTTPRequestClient requestClient = var10.setHeaders1(MapsKt.hashMapOf(var7)).build();
+      requestClient.getResponseFromRequest((Function1)(new Function1() {
+         public final void invoke(@Nullable Object result) {
+            InitialiseSDKModel configs = result instanceof InitialiseSDKModel ? (InitialiseSDKModel)result : null;
+            Function2 var27;
+            Boolean var29;
+            UnexpectedError var30;
+            String var31;
+            if (!Intrinsics.areEqual(configs != null ? configs.getStatus() : null, "success")) {
+               if (Intrinsics.areEqual(configs != null ? configs.getMessage() : null, "Invalid dev-id was provided")) {
+                  TerraManager.this.getCompletion().invoke(false, new InvalidDevId(configs.getMessage()));
+               } else {
+                  label56: {
+                     var27 = TerraManager.this.getCompletion();
+                     var29 = false;
+                     var30 = new UnexpectedError;
+                     if (configs != null) {
+                        var31 = configs.getMessage();
+                        if (var31 != null) {
+                           break label56;
+                        }
+                     }
+
+                     var31 = "";
+                  }
+
+                  var30.<init>(var31);
+                  var27.invoke(var29, var30);
+               }
+
+            } else {
+               TerraManager var10000 = TerraManager.this;
+               ArrayList var10001 = configs.getWebhook_intervals();
+               Intrinsics.checkNotNull(var10001);
+               var10000.activityTimer = (long)(((Number)var10001.get(0)).intValue() * 60 * 1000);
+               TerraManager.this.dailyTimer = (long)(((Number)configs.getWebhook_intervals().get(1)).intValue() * 60 * 1000);
+               TerraManager.this.bodyTimer = (long)(((Number)configs.getWebhook_intervals().get(2)).intValue() * 60 * 1000);
+               TerraManager.this.sleepTimer = (long)(((Number)configs.getWebhook_intervals().get(3)).intValue() * 60 * 1000);
+               TerraManager.this.nutritionTimer = (long)(((Number)configs.getWebhook_intervals().get(4)).intValue() * 60 * 1000);
+               TerraManager.this.preferences.edit().putLong("co.tryterra.body.timer", TerraManager.this.bodyTimer).apply();
+               TerraManager.this.preferences.edit().putLong("co.tryterra.sleep.timer", TerraManager.this.sleepTimer).apply();
+               TerraManager.this.preferences.edit().putLong("co.tryterra.activity.timer", TerraManager.this.activityTimer).apply();
+               TerraManager.this.preferences.edit().putLong("co.tryterra.daily.timer", TerraManager.this.dailyTimer).apply();
+               TerraManager.this.preferences.edit().putLong("co.tryterra.nutrition.timer", TerraManager.this.nutritionTimer).apply();
+               TerraManager.this.preferences.edit().putString("co.tryterra.dev.id", TerraManager.this.devId).apply();
+               var10000 = TerraManager.this;
+               Permissions.Companion var25 = Permissions.Companion;
+               String var10002 = configs.getFull_scopes();
+               Intrinsics.checkNotNull(var10002);
+               var10000.permissions = var25.fromScopes(var10002);
+               final boolean schedulerOn = TerraManager.this.preferences.getBoolean("co.tryterra.scheduler.on", true);
+               Companion var23 = TerraManager.Companion;
+               var10001 = configs.getUsers();
+               Intrinsics.checkNotNull(var10001);
+               var23.setUsers$TerraAndroid_release(var10001);
+               CountDownLatch countDownLatch = new CountDownLatch(TerraManager.Companion.getUsers$TerraAndroid_release().size());
+               WorkManager var24 = WorkManager.getInstance(TerraManager.this.context);
+               Intrinsics.checkNotNullExpressionValue(var24, "getInstance(this.context)");
+               final WorkManager workManager = var24;
+               final Constraints constraints = (new Constraints.Builder()).setRequiredNetworkType(NetworkType.CONNECTED).build();
+               Iterator var7 = TerraManager.Companion.getUsers$TerraAndroid_release().iterator();
+
+               while(true) {
+                  while(var7.hasNext()) {
+                     label97: {
+                        final Users user = (Users)var7.next();
+                        String var9 = user.getResource();
+                        switch (var9.hashCode()) {
+                           case -1712043046:
+                              if (!var9.equals("SAMSUNG")) {
+                                 break label97;
+                              }
+                              break;
+                           case -1021737497:
+                              if (!var9.equals("HEALTH_CONNECT")) {
+                                 break label97;
+                              }
+                              break;
+                           case -463340697:
+                              if (var9.equals("FREESTYLELIBRESDK")) {
+                                 TerraManager.this.initFreeStyleLibre(user.getUser_id(), (String)null, TerraManager.this.context, (String)null, countDownLatch, (Function2)null.INSTANCE);
+                                 continue;
+                              }
+                              break label97;
+                           case -33855720:
+                              if (!var9.equals("GOOGLEFIT")) {
+                                 break label97;
+                              }
+                              break;
+                           default:
+                              break label97;
+                        }
+
+                        Set var26 = TerraManager.this.preferences.getStringSet("co.tryterra.googlefit.custom.permissions", SetsKt.emptySet());
+                        Intrinsics.checkNotNull(var26);
+                        Iterable $this$map$iv = (Iterable)var26;
+                        int $i$f$map = false;
+                        Collection destination$iv$iv = (Collection)(new ArrayList(CollectionsKt.collectionSizeOrDefault($this$map$iv, 10)));
+                        int $i$f$mapTo = false;
+                        Iterator var16 = $this$map$iv.iterator();
+
+                        while(var16.hasNext()) {
+                           Object item$iv$iv = var16.next();
+                           String it = (String)item$iv$iv;
+                           int var19 = false;
+                           Intrinsics.checkNotNullExpressionValue(it, "it");
+                           destination$iv$iv.add(CustomPermissions.valueOf(it));
+                        }
+
+                        Set customPerm = CollectionsKt.toSet((Iterable)((List)destination$iv$iv));
+                        var10000 = TerraManager.this;
+                        String var28 = user.getUser_id();
+                        var10002 = user.getResource();
+                        Context var10004 = TerraManager.this.context;
+                        Set var10005 = TerraManager.this.permissions;
+                        if (var10005 == null) {
+                           Intrinsics.throwUninitializedPropertyAccessException("permissions");
+                           var10005 = null;
+                        }
+
+                        var10000.initHealthConnect(var28, var10002, (String)null, var10004, var10005, customPerm, countDownLatch, (Function2)(new Function2() {
+                           public final void invoke(boolean success, @Nullable TerraError var2) {
+                              if (schedulerOn && success) {
+                                 int $i$f$OneTimeWorkRequestBuilder = false;
+                                 OneTimeWorkRequest.Builder var10000 = (OneTimeWorkRequest.Builder)((OneTimeWorkRequest.Builder)(new OneTimeWorkRequest.Builder(ScheduleMimic.class)).setConstraints(constraints)).setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST);
+                                 Pair[] pairs$iv = new Pair[]{TuplesKt.to("resource", user.getResource()), null};
+                                 Set var10004 = TerraManager.this.permissions;
+                                 if (var10004 == null) {
+                                    Intrinsics.throwUninitializedPropertyAccessException("permissions");
+                                    var10004 = null;
+                                 }
+
+                                 pairs$iv[1] = TuplesKt.to("permissions", var10004.stream().map(<undefinedtype>::invoke$lambda-0).collect(Collectors.joining((CharSequence)",")));
+                                 pairs$iv = pairs$iv;
+                                 OneTimeWorkRequest.Builder var10 = var10000;
+                                 int $i$f$workDataOf = false;
+                                 Data.Builder dataBuilder$iv = new Data.Builder();
+                                 int var7 = 0;
+
+                                 for(int var8 = pairs$iv.length; var7 < var8; ++var7) {
+                                    Pair pair$iv = pairs$iv[var7];
+                                    dataBuilder$iv.put((String)pair$iv.getFirst(), pair$iv.getSecond());
+                                 }
+
+                                 Data var12 = dataBuilder$iv.build();
+                                 Intrinsics.checkNotNullExpressionValue(var12, "dataBuilder.build()");
+                                 OneTimeWorkRequest oneTimeRequest = (OneTimeWorkRequest)((OneTimeWorkRequest.Builder)var10.setInputData(var12)).build();
+                                 WorkManager var13 = workManager;
+                                 StringBuilder var10001 = (new StringBuilder()).append("co.tryterra.");
+                                 String var10002 = user.getResource().toLowerCase(Locale.ROOT);
+                                 Intrinsics.checkNotNullExpressionValue(var10002, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                                 var13.beginUniqueWork(var10001.append(var10002).append(".scheduler.mimic").toString(), ExistingWorkPolicy.APPEND, oneTimeRequest).enqueue();
+                              }
+
+                           }
+
+                           private static final String invoke$lambda_0/* $FF was: invoke$lambda-0*/(Permissions it) {
+                              return it.name();
+                           }
+
+                           // $FF: synthetic method
+                           // $FF: bridge method
+                           public Object invoke(Object p1, Object p2) {
+                              this.invoke((Boolean)p1, (TerraError)p2);
+                              return Unit.INSTANCE;
+                           }
+                        }));
+                        continue;
+                     }
+
+                     Log.e("TerraManager", "Unknown resource?");
+                  }
+
+                  try {
+                     countDownLatch.await(2L, TimeUnit.SECONDS);
+                     TerraManager.this.executeSubscriptionQueries();
+                     TerraManager.this.getCompletion().invoke(true, (Object)null);
+                  } catch (InterruptedException var21) {
+                     InterruptedException e = var21;
+                     var27 = TerraManager.this.getCompletion();
+                     var29 = false;
+                     var30 = new UnexpectedError;
+                     var31 = e.getMessage();
+                     if (var31 == null) {
+                        var31 = "";
+                     }
+
+                     var30.<init>(var31);
+                     var27.invoke(var29, var30);
+                  }
+
+                  return;
+               }
+            }
+         }
+
+         // $FF: synthetic method
+         // $FF: bridge method
+         public Object invoke(Object p1) {
+            this.invoke(p1);
+            return Unit.INSTANCE;
+         }
+      }));
+   }
+
+   // $FF: synthetic method
+   TerraManager(String var1, Context var2, String var3, Function2 var4, int var5, DefaultConstructorMarker var6) {
+      if ((var5 & 4) != 0) {
+         var3 = null;
+      }
+
+      this(var1, var2, var3, var4);
+   }
+
+   @Nullable
+   public final String getReferenceId() {
+      return this.referenceId;
+   }
+
+   @NotNull
+   public final Function2 getCompletion() {
+      return this.completion;
+   }
+
+   @NotNull
+   public CoroutineContext getCoroutineContext() {
+      CompletableJob var10000 = this.job;
+      ExecutorService var10001 = this.singleThreadExecutor;
+      Intrinsics.checkNotNullExpressionValue(var10001, "singleThreadExecutor");
+      return var10000.plus((CoroutineContext)ExecutorsKt.from(var10001));
+   }
+
+   @SuppressLint({"HardwareIds"})
+   private final String getUniqueId() {
+      return Secure.getString(this.context.getContentResolver(), "android_id");
+   }
+
+   private final void initFreeStyleLibre(String userId, String token, final Context context, final String startIntent, final CountDownLatch latch, final Function2 completion) {
+      if (userId != null) {
+         this.preferences.edit().putBoolean("co.tryterra.terra.fslsdk", true).apply();
+         if (startIntent != null) {
+            this.preferences.edit().putString("co.tryterra.terra.fslsdkscan", startIntent).apply();
+         }
+
+         SharedPreferences preferencesDev = context.getSharedPreferences("co.tryterra.co.devid", 0);
+         preferencesDev.edit().putString("co.tryterra.co.devid", this.devId).apply();
+      } else {
+         HTTPRequestClient.Builder var10000 = (new HTTPRequestClient.Builder()).setUrl(this.referenceId != null ? "https://api.tryterra.co/v2/auth/authenticateSDKUser?resource=freestylelibresdk&resource_user_identifier=" + this.getUniqueId() + "sfsl&reference_id=" + this.referenceId : "https://api.tryterra.co/v2/auth/authenticateSDKUser?resource=freestylelibresdk&resource_user_identifier=" + this.getUniqueId() + "sfsl");
+         Pair[] var8 = new Pair[]{TuplesKt.to("dev-id", this.devId), null};
+         Intrinsics.checkNotNull(token);
+         var8[1] = TuplesKt.to("token", token);
+         HTTPRequestClient httpRequestClient = var10000.setHeaders1(MapsKt.hashMapOf(var8)).method("POST").withInput(InitUserModel.class).build();
+         httpRequestClient.getResponseFromRequest((Function1)(new Function1() {
+            public final void invoke(@Nullable Object result) {
+               CountDownLatch var4;
+               if (result == null) {
+                  completion.invoke(false, new NoInternet());
+                  var4 = latch;
+                  if (var4 != null) {
+                     var4.countDown();
+                  }
+
+               } else {
+                  InitUserModel configs = (InitUserModel)result;
+                  String var10003;
+                  if (configs.getMessage() != null) {
+                     Function2 var10000 = completion;
+                     Boolean var10001 = false;
+                     TerraManager var10002 = TerraManager.this;
+                     var10003 = configs.getMessage();
+                     Intrinsics.checkNotNull(var10003);
+                     var10000.invoke(var10001, var10002.handleInitConnectionError(var10003));
+                     var4 = latch;
+                     if (var4 != null) {
+                        var4.countDown();
+                     }
+                  }
+
+                  TerraManager.this.preferences.edit().putBoolean("co.tryterra.terra.fslsdk", true).apply();
+                  if (startIntent != null) {
+                     TerraManager.this.preferences.edit().putString("co.tryterra.terra.fslsdkscan", startIntent).apply();
+                  }
+
+                  SharedPreferences preferencesDev = context.getSharedPreferences("co.tryterra.co.devid", 0);
+                  preferencesDev.edit().putString("co.tryterra.co.devid", TerraManager.this.devId).apply();
+                  ArrayList var5 = TerraManager.Companion.getUsers$TerraAndroid_release();
+                  var10003 = configs.getUser_id();
+                  Intrinsics.checkNotNull(var10003);
+                  var5.add(new Users(var10003, "FREESTYLELIBRESDK"));
+                  completion.invoke(true, (Object)null);
+                  var4 = latch;
+                  if (var4 != null) {
+                     var4.countDown();
+                  }
+
+               }
+            }
+
+            // $FF: synthetic method
+            // $FF: bridge method
+            public Object invoke(Object p1) {
+               this.invoke(p1);
+               return Unit.INSTANCE;
+            }
+         }));
+      }
+
+   }
+
+   private final void initHealthConnect(String userId, final String resource, String token, final Context context, Set permissions, final Set customPermissions, final CountDownLatch latch, final Function2 completion) {
+      Log.i("TerraManager", String.valueOf(androidx.health.connect.client.HealthConnectClient.Companion.getSdkStatus$default(HealthConnectClient.Companion, this.context, (String)null, 2, (Object)null)));
+      if (androidx.health.connect.client.HealthConnectClient.Companion.getSdkStatus$default(HealthConnectClient.Companion, this.context, (String)null, 2, (Object)null) != 3) {
+         completion.invoke(false, new HealthConnectUnavailable("Health Connect is not available on this device"));
+         if (latch != null) {
+            latch.countDown();
+         }
+
+      } else {
+         Optional var28;
+         if (customPermissions.isEmpty()) {
+            Iterable $this$mapNotNull$iv = (Iterable)permissions;
+            int $i$f$mapNotNull = false;
+            Collection destination$iv$iv = (Collection)(new ArrayList());
+            int $i$f$mapNotNullTo = false;
+            Iterable $this$forEach$iv$iv$iv = $this$mapNotNull$iv;
+            int $i$f$forEach = false;
+            Iterator var17 = $this$forEach$iv$iv$iv.iterator();
+
+            while(var17.hasNext()) {
+               Object element$iv$iv$iv = var17.next();
+               Object element$iv$iv = element$iv$iv$iv;
+               int var20 = false;
+               Permissions it = (Permissions)element$iv$iv;
+               int var22 = false;
+               HCPermissions var10000 = HealthConnect.Companion.mapTerraPermissionToHCPermission(it);
+               Set var27 = var10000 != null ? var10000.getPermissions() : null;
+               if (var27 != null) {
+                  Object it$iv$iv = var27;
+                  int var24 = false;
+                  destination$iv$iv.add(it$iv$iv);
+               }
+            }
+
+            var28 = ((List)destination$iv$iv).stream().reduce(TerraManager::initHealthConnect$lambda-2);
+         } else {
+            var28 = customPermissions.stream().map(TerraManager::initHealthConnect$lambda-3).reduce(TerraManager::initHealthConnect$lambda-4);
+         }
+
+         final Optional hcPermissions = var28;
+         if (userId != null && this.healthConnect == null) {
+            String var10004 = this.devId;
+            Object var10005 = hcPermissions.orElse(SetsKt.emptySet());
+            Intrinsics.checkNotNullExpressionValue(var10005, "hcPermissions.orElse(setOf())");
+            this.healthConnect = new HealthConnect(context, var10004, (Set)var10005, this.healthConnectPermissionContract, latch, completion);
+         } else if (userId != null) {
+            completion.invoke(true, (Object)null);
+         } else {
+            HTTPRequestClient.Builder var29 = new HTTPRequestClient.Builder();
+            StringBuilder var10001;
+            String var10002;
+            String var10003;
+            String var30;
+            Companion var31;
+            if (this.referenceId != null) {
+               var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/auth/authenticateSDKUser?resource=");
+               var10002 = resource.toLowerCase(Locale.ROOT);
+               Intrinsics.checkNotNullExpressionValue(var10002, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+               var10001 = var10001.append(var10002).append("&resource_user_identifier=").append(this.getUniqueId());
+               var31 = Companion;
+               var10003 = resource.toLowerCase(Locale.ROOT);
+               Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+               var30 = var10001.append(var31.resourceToIdEndings(var10003)).append("&reference_id=").append(this.referenceId).toString();
+            } else {
+               var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/auth/authenticateSDKUser?resource=");
+               var10002 = resource.toLowerCase(Locale.ROOT);
+               Intrinsics.checkNotNullExpressionValue(var10002, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+               var10001 = var10001.append(var10002).append("&resource_user_identifier=").append(this.getUniqueId());
+               var31 = Companion;
+               var10003 = resource.toLowerCase(Locale.ROOT);
+               Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+               var30 = var10001.append(var31.resourceToIdEndings(var10003)).toString();
+            }
+
+            var29 = var29.setUrl(var30);
+            Pair[] var26 = new Pair[]{TuplesKt.to("dev-id", this.devId), null};
+            Intrinsics.checkNotNull(token);
+            var26[1] = TuplesKt.to("token", token);
+            HTTPRequestClient httpRequestClient = var29.setHeaders1(MapsKt.hashMapOf(var26)).method("POST").withInput(InitUserModel.class).build();
+            httpRequestClient.getResponseFromRequest((Function1)(new Function1() {
+               public final void invoke(@Nullable Object result) {
+                  CountDownLatch var8;
+                  if (result == null) {
+                     completion.invoke(false, new NoInternet());
+                     var8 = latch;
+                     if (var8 != null) {
+                        var8.countDown();
+                     }
+
+                  } else {
+                     InitUserModel configs = (InitUserModel)result;
+                     String var10003;
+                     if (configs.getMessage() != null) {
+                        Function2 var7 = completion;
+                        Boolean var10001 = false;
+                        TerraManager var9 = TerraManager.this;
+                        var10003 = configs.getMessage();
+                        Intrinsics.checkNotNull(var10003);
+                        var7.invoke(var10001, var9.handleInitConnectionError(var10003));
+                        var8 = latch;
+                        if (var8 != null) {
+                           var8.countDown();
+                        }
+
+                     } else {
+                        Set var4 = TerraManager.this.preferences.getStringSet("co.tryterra.googlefit.custom.permissions", SetsKt.emptySet());
+                        Set currentPermissions = var4 == null ? SetsKt.emptySet() : var4;
+                        ArrayList var10000 = TerraManager.Companion.getUsers$TerraAndroid_release();
+                        var10003 = configs.getUser_id();
+                        Intrinsics.checkNotNull(var10003);
+                        var10000.add(new Users(var10003, resource));
+                        SharedPreferences.Editor var5 = TerraManager.this.preferences.edit();
+                        Object var10002 = customPermissions.stream().map(<undefinedtype>::invoke$lambda-0).collect(Collectors.toSet());
+                        Intrinsics.checkNotNullExpressionValue(var10002, "customPermissions.stream…llect(Collectors.toSet())");
+                        var5.putStringSet("co.tryterra.googlefit.custom.permissions", CollectionsKt.union((Iterable)var10002, (Iterable)currentPermissions)).apply();
+                        TerraManager var6 = TerraManager.this;
+                        Context var10 = context;
+                        String var10004 = TerraManager.this.devId;
+                        Object var10005 = hcPermissions.orElse(SetsKt.emptySet());
+                        Intrinsics.checkNotNullExpressionValue(var10005, "hcPermissions.orElse(setOf())");
+                        var6.healthConnect = new HealthConnect(var10, var10004, (Set)var10005, TerraManager.this.healthConnectPermissionContract, latch, completion);
+                     }
+                  }
+               }
+
+               private static final String invoke$lambda_0/* $FF was: invoke$lambda-0*/(CustomPermissions it) {
+                  return it.name();
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1) {
+                  this.invoke(p1);
+                  return Unit.INSTANCE;
+               }
+            }));
+         }
+      }
+   }
+
+   private final TerraError handleInitConnectionError(String message) {
+      TerraError var10000;
+      switch (message) {
+         case "Invalid dev-id was provided":
+            var10000 = (TerraError)(new InvalidDevId(message));
+            return var10000;
+         case "Current user limit has been reached":
+            var10000 = (TerraError)(new UserLimitExceeded(message));
+            return var10000;
+         case "Invalid authentication token passed":
+            var10000 = (TerraError)(new InvalidAuthToken(message));
+            return var10000;
+      }
+
+      var10000 = (TerraError)(new UnexpectedError(message));
+      return var10000;
+   }
+
+   private final void executeSubscriptionQueries() {
+      if (Terra.Companion.getUpdateHandler() != null && this.healthConnect != null) {
+         Set subscribedTypes = this.preferences.getStringSet("co.tryterra.subscribed.types.google.fit", SetsKt.emptySet());
+         Collection var2 = (Collection)subscribedTypes;
+         if (var2 != null && !var2.isEmpty()) {
+            Iterable $this$forEach$iv = (Iterable)subscribedTypes;
+            int $i$f$forEach = false;
+            Iterator var4 = $this$forEach$iv.iterator();
+
+            while(var4.hasNext()) {
+               Object element$iv = var4.next();
+               String it = (String)element$iv;
+               int var7 = false;
+               if (!Intrinsics.areEqual(it, "STEPS")) {
+                  HealthConnect var10000 = this.healthConnect;
+                  Intrinsics.checkNotNull(var10000);
+                  Function2 var10001 = Terra.Companion.getUpdateHandler();
+                  Intrinsics.checkNotNull(var10001);
+                  var10000.requestChanges(var10001);
+               }
+            }
+
+         }
+      }
+   }
+
+   public final void initConnection(@NotNull Connections connection, @NotNull final String token, @NotNull final Context context, @NotNull final Set customPermissions, boolean schedulerOn, @Nullable final String startIntent, @NotNull final Function2 completion) {
+      Intrinsics.checkNotNullParameter(connection, "connection");
+      Intrinsics.checkNotNullParameter(token, "token");
+      Intrinsics.checkNotNullParameter(context, "context");
+      Intrinsics.checkNotNullParameter(customPermissions, "customPermissions");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      this.preferences.edit().putBoolean("co.tryterra.scheduler.on", schedulerOn).apply();
+      if (this.permissions == null) {
+         completion.invoke(false, new TerraClassNotInitiated("Please make sure the Terra class is initialised properly"));
+      } else {
+         switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[connection.ordinal()]) {
+            case 1:
+               BuildersKt.launch$default((CoroutineScope)this, (CoroutineContext)null, (CoroutineStart)null, (Function2)(new Function2((Continuation)null) {
+                  int label;
+
+                  @Nullable
+                  public final Object invokeSuspend(@NotNull Object var1) {
+                     IntrinsicsKt.getCOROUTINE_SUSPENDED();
+                     switch (this.label) {
+                        case 0:
+                           ResultKt.throwOnFailure(var1);
+                           TerraManager var10000 = TerraManager.this;
+                           String var10003 = token;
+                           Context var10004 = context;
+                           Set var10005 = TerraManager.this.permissions;
+                           if (var10005 == null) {
+                              Intrinsics.throwUninitializedPropertyAccessException("permissions");
+                              var10005 = null;
+                           }
+
+                           var10000.initHealthConnect((String)null, "GOOGLEFIT", var10003, var10004, var10005, customPermissions, (CountDownLatch)null, completion);
+                           return Unit.INSTANCE;
+                        default:
+                           throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+                     }
+                  }
+
+                  @NotNull
+                  public final Continuation create(@Nullable Object value, @NotNull Continuation $completion) {
+                     return (Continuation)(new <anonymous constructor>($completion));
+                  }
+
+                  @Nullable
+                  public final Object invoke(@NotNull CoroutineScope p1, @Nullable Continuation p2) {
+                     return ((<undefinedtype>)this.create(p1, p2)).invokeSuspend(Unit.INSTANCE);
+                  }
+
+                  // $FF: synthetic method
+                  // $FF: bridge method
+                  public Object invoke(Object p1, Object p2) {
+                     return this.invoke((CoroutineScope)p1, (Continuation)p2);
+                  }
+               }), 3, (Object)null);
+               break;
+            case 2:
+               BuildersKt.launch$default((CoroutineScope)this, (CoroutineContext)null, (CoroutineStart)null, (Function2)(new Function2((Continuation)null) {
+                  int label;
+
+                  @Nullable
+                  public final Object invokeSuspend(@NotNull Object var1) {
+                     IntrinsicsKt.getCOROUTINE_SUSPENDED();
+                     switch (this.label) {
+                        case 0:
+                           ResultKt.throwOnFailure(var1);
+                           TerraManager var10000 = TerraManager.this;
+                           String var10003 = token;
+                           Context var10004 = context;
+                           Set var10005 = TerraManager.this.permissions;
+                           if (var10005 == null) {
+                              Intrinsics.throwUninitializedPropertyAccessException("permissions");
+                              var10005 = null;
+                           }
+
+                           var10000.initHealthConnect((String)null, "SAMSUNG", var10003, var10004, var10005, customPermissions, (CountDownLatch)null, completion);
+                           return Unit.INSTANCE;
+                        default:
+                           throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+                     }
+                  }
+
+                  @NotNull
+                  public final Continuation create(@Nullable Object value, @NotNull Continuation $completion) {
+                     return (Continuation)(new <anonymous constructor>($completion));
+                  }
+
+                  @Nullable
+                  public final Object invoke(@NotNull CoroutineScope p1, @Nullable Continuation p2) {
+                     return ((<undefinedtype>)this.create(p1, p2)).invokeSuspend(Unit.INSTANCE);
+                  }
+
+                  // $FF: synthetic method
+                  // $FF: bridge method
+                  public Object invoke(Object p1, Object p2) {
+                     return this.invoke((CoroutineScope)p1, (Continuation)p2);
+                  }
+               }), 3, (Object)null);
+               break;
+            case 3:
+               BuildersKt.launch$default((CoroutineScope)this, (CoroutineContext)null, (CoroutineStart)null, (Function2)(new Function2((Continuation)null) {
+                  int label;
+
+                  @Nullable
+                  public final Object invokeSuspend(@NotNull Object var1) {
+                     IntrinsicsKt.getCOROUTINE_SUSPENDED();
+                     switch (this.label) {
+                        case 0:
+                           ResultKt.throwOnFailure(var1);
+                           TerraManager var10000 = TerraManager.this;
+                           String var10003 = token;
+                           Context var10004 = context;
+                           Set var10005 = TerraManager.this.permissions;
+                           if (var10005 == null) {
+                              Intrinsics.throwUninitializedPropertyAccessException("permissions");
+                              var10005 = null;
+                           }
+
+                           var10000.initHealthConnect((String)null, "HEALTH_CONNECT", var10003, var10004, var10005, customPermissions, (CountDownLatch)null, completion);
+                           return Unit.INSTANCE;
+                        default:
+                           throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+                     }
+                  }
+
+                  @NotNull
+                  public final Continuation create(@Nullable Object value, @NotNull Continuation $completion) {
+                     return (Continuation)(new <anonymous constructor>($completion));
+                  }
+
+                  @Nullable
+                  public final Object invoke(@NotNull CoroutineScope p1, @Nullable Continuation p2) {
+                     return ((<undefinedtype>)this.create(p1, p2)).invokeSuspend(Unit.INSTANCE);
+                  }
+
+                  // $FF: synthetic method
+                  // $FF: bridge method
+                  public Object invoke(Object p1, Object p2) {
+                     return this.invoke((CoroutineScope)p1, (Continuation)p2);
+                  }
+               }), 3, (Object)null);
+               break;
+            case 4:
+               BuildersKt.launch$default((CoroutineScope)this, (CoroutineContext)null, (CoroutineStart)null, (Function2)(new Function2((Continuation)null) {
+                  int label;
+
+                  @Nullable
+                  public final Object invokeSuspend(@NotNull Object var1) {
+                     IntrinsicsKt.getCOROUTINE_SUSPENDED();
+                     switch (this.label) {
+                        case 0:
+                           ResultKt.throwOnFailure(var1);
+                           TerraManager.this.initFreeStyleLibre((String)null, token, context, startIntent, (CountDownLatch)null, completion);
+                           return Unit.INSTANCE;
+                        default:
+                           throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+                     }
+                  }
+
+                  @NotNull
+                  public final Continuation create(@Nullable Object value, @NotNull Continuation $completion) {
+                     return (Continuation)(new <anonymous constructor>($completion));
+                  }
+
+                  @Nullable
+                  public final Object invoke(@NotNull CoroutineScope p1, @Nullable Continuation p2) {
+                     return ((<undefinedtype>)this.create(p1, p2)).invokeSuspend(Unit.INSTANCE);
+                  }
+
+                  // $FF: synthetic method
+                  // $FF: bridge method
+                  public Object invoke(Object p1, Object p2) {
+                     return this.invoke((CoroutineScope)p1, (Continuation)p2);
+                  }
+               }), 3, (Object)null);
+         }
+
+      }
+   }
+
+   // $FF: synthetic method
+   public static void initConnection$default(TerraManager var0, Connections var1, String var2, Context var3, Set var4, boolean var5, String var6, Function2 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var4 = SetsKt.emptySet();
+      }
+
+      if ((var8 & 16) != 0) {
+         var5 = true;
+      }
+
+      if ((var8 & 32) != 0) {
+         var6 = null;
+      }
+
+      if ((var8 & 64) != 0) {
+         var7 = (Function2)null.INSTANCE;
+      }
+
+      var0.initConnection(var1, var2, var3, var4, var5, var6, var7);
+   }
+
+   @Nullable
+   public final String getUserId(@NotNull Connections type) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Object var10000;
+      Iterable $this$firstOrNull$iv;
+      boolean $i$f$firstOrNull;
+      Iterator var4;
+      Object element$iv;
+      Users it;
+      boolean var7;
+      String var8;
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+            $this$firstOrNull$iv = (Iterable)users;
+            $i$f$firstOrNull = false;
+            var4 = $this$firstOrNull$iv.iterator();
+
+            while(true) {
+               if (!var4.hasNext()) {
+                  var10000 = null;
+                  break;
+               }
+
+               element$iv = var4.next();
+               it = (Users)element$iv;
+               var7 = false;
+               if (Intrinsics.areEqual(it.getResource(), "GOOGLEFIT")) {
+                  var10000 = element$iv;
+                  break;
+               }
+            }
+
+            var8 = (Users)var10000 != null ? ((Users)var10000).getUser_id() : null;
+            break;
+         case 2:
+            $this$firstOrNull$iv = (Iterable)users;
+            $i$f$firstOrNull = false;
+            var4 = $this$firstOrNull$iv.iterator();
+
+            while(true) {
+               if (!var4.hasNext()) {
+                  var10000 = null;
+                  break;
+               }
+
+               element$iv = var4.next();
+               it = (Users)element$iv;
+               var7 = false;
+               if (Intrinsics.areEqual(it.getResource(), "SAMSUNG")) {
+                  var10000 = element$iv;
+                  break;
+               }
+            }
+
+            var8 = (Users)var10000 != null ? ((Users)var10000).getUser_id() : null;
+            break;
+         case 3:
+            $this$firstOrNull$iv = (Iterable)users;
+            $i$f$firstOrNull = false;
+            var4 = $this$firstOrNull$iv.iterator();
+
+            while(true) {
+               if (!var4.hasNext()) {
+                  var10000 = null;
+                  break;
+               }
+
+               element$iv = var4.next();
+               it = (Users)element$iv;
+               var7 = false;
+               if (Intrinsics.areEqual(it.getResource(), "HEALTH_CONNECT")) {
+                  var10000 = element$iv;
+                  break;
+               }
+            }
+
+            var8 = (Users)var10000 != null ? ((Users)var10000).getUser_id() : null;
+            break;
+         case 4:
+            $this$firstOrNull$iv = (Iterable)users;
+            $i$f$firstOrNull = false;
+            var4 = $this$firstOrNull$iv.iterator();
+
+            while(true) {
+               if (!var4.hasNext()) {
+                  var10000 = null;
+                  break;
+               }
+
+               element$iv = var4.next();
+               it = (Users)element$iv;
+               var7 = false;
+               if (Intrinsics.areEqual(it.getResource(), "FREESTYLELIBRESDK")) {
+                  var10000 = element$iv;
+                  break;
+               }
+            }
+
+            var8 = (Users)var10000 != null ? ((Users)var10000).getUser_id() : null;
+            break;
+         default:
+            throw new NoWhenBranchMatchedException();
+      }
+
+      return var8;
+   }
+
+   public final void getDaily(@NotNull Connections type, long startDate, long endDate, boolean toWebhook, @NotNull Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Date var10002 = Date.from(Instant.ofEpochSecond(startDate));
+      Intrinsics.checkNotNullExpressionValue(var10002, "from(Instant.ofEpochSecond(startDate))");
+      Date var10003 = Date.from(Instant.ofEpochSecond(endDate));
+      Intrinsics.checkNotNullExpressionValue(var10003, "from(Instant.ofEpochSecond(endDate))");
+      this.getDaily(type, var10002, var10003, toWebhook, completion);
+   }
+
+   // $FF: synthetic method
+   public static void getDaily$default(TerraManager var0, Connections var1, long var2, long var4, boolean var6, Function3 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var6 = true;
+      }
+
+      if ((var8 & 16) != 0) {
+         var7 = (Function3)null.INSTANCE;
+      }
+
+      var0.getDaily(var1, var2, var4, var6, var7);
+   }
+
+   public final void getDaily(@NotNull final Connections type, @NotNull Date startDate, @NotNull Date endDate, final boolean toWebhook, @NotNull final Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(startDate, "startDate");
+      Intrinsics.checkNotNullParameter(endDate, "endDate");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+         case 2:
+         case 3:
+            if (this.healthConnect == null) {
+               Log.e("TerraManager", "Terra not connected.");
+               completion.invoke(false, (Object)null, new Unauthorised("Not connected to Health Connect"));
+               return;
+            }
+
+            HealthConnect var10000 = this.healthConnect;
+            Intrinsics.checkNotNull(var10000);
+            var10000.getDaily(type, startDate, endDate, false, toWebhook, (Function3)(new Function3() {
+               public final void invoke(boolean success, @Nullable String data, @Nullable TerraError err) {
+                  if (success) {
+                     if (toWebhook) {
+                        completion.invoke(success, new TerraWebhookResponse(data, (String)null, (String)null, (String)null, (TerraUser)null, 30, (DefaultConstructorMarker)null), err);
+                     } else {
+                        TerraManager this_$iv = TerraManager.this;
+                        Intrinsics.checkNotNull(data);
+                        String var10000 = type.name().toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10000, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        String resource$iv = var10000;
+                        String datatype$iv = "daily";
+                        Function3 var8 = completion;
+                        int $i$f$normalizeData = false;
+                        HTTPRequestClient.Builder var11 = new HTTPRequestClient.Builder();
+                        StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype$iv).append('/').append(resource$iv).append("?resource_user_id=").append(this_$iv.getUniqueId());
+                        Companion var10002 = TerraManager.Companion;
+                        String var10003 = resource$iv.toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        var11 = var11.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+                        Pair[] var10 = new Pair[]{TuplesKt.to("dev-id", this_$iv.devId)};
+                        var11.setHeaders1(MapsKt.hashMapOf(var10)).withOutput(data).withInput(TerraDailyDataPayload.class).build().getResponseFromRequest((Function1)(new TerraManager$getDaily$3$invoke$$inlined$normalizeData$1(var8, success)));
+                     }
+                  } else {
+                     completion.invoke(success, new TerraErrorResponse(data, (String)null, (String)null, 6, (DefaultConstructorMarker)null), err);
+                  }
+
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1, Object p2, Object p3) {
+                  this.invoke((Boolean)p1, (String)p2, (TerraError)p3);
+                  return Unit.INSTANCE;
+               }
+            }));
+            break;
+         default:
+            Log.e("TerraManager", "Resource does not support this datatype");
+            completion.invoke(false, (Object)null, new UnSupportedResource("Resource does not support this datatype"));
+      }
+
+   }
+
+   // $FF: synthetic method
+   public static void getDaily$default(TerraManager var0, Connections var1, Date var2, Date var3, boolean var4, Function3 var5, int var6, Object var7) {
+      if ((var6 & 8) != 0) {
+         var4 = true;
+      }
+
+      if ((var6 & 16) != 0) {
+         var5 = (Function3)null.INSTANCE;
+      }
+
+      var0.getDaily(var1, var2, var3, var4, var5);
+   }
+
+   public final void getSleep(@NotNull Connections type, long startDate, long endDate, boolean toWebhook, @NotNull Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Date var10002 = Date.from(Instant.ofEpochSecond(startDate));
+      Intrinsics.checkNotNullExpressionValue(var10002, "from(Instant.ofEpochSecond(startDate))");
+      Date var10003 = Date.from(Instant.ofEpochSecond(endDate));
+      Intrinsics.checkNotNullExpressionValue(var10003, "from(Instant.ofEpochSecond(endDate))");
+      this.getSleep(type, var10002, var10003, toWebhook, completion);
+   }
+
+   // $FF: synthetic method
+   public static void getSleep$default(TerraManager var0, Connections var1, long var2, long var4, boolean var6, Function3 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var6 = true;
+      }
+
+      if ((var8 & 16) != 0) {
+         var7 = (Function3)null.INSTANCE;
+      }
+
+      var0.getSleep(var1, var2, var4, var6, var7);
+   }
+
+   public final void getSleep(@NotNull final Connections type, @NotNull Date startDate, @NotNull Date endDate, final boolean toWebhook, @NotNull final Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(startDate, "startDate");
+      Intrinsics.checkNotNullParameter(endDate, "endDate");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+         case 2:
+         case 3:
+            if (this.healthConnect == null) {
+               Log.e("TerraManager", "Terra not connected.");
+               completion.invoke(false, (Object)null, new Unauthorised("Not connected to Health Connect"));
+               return;
+            }
+
+            HealthConnect var10000 = this.healthConnect;
+            Intrinsics.checkNotNull(var10000);
+            var10000.getSleep(type, startDate, endDate, false, toWebhook, (Function3)(new Function3() {
+               public final void invoke(boolean success, @Nullable String data, @Nullable TerraError err) {
+                  if (success) {
+                     if (toWebhook) {
+                        completion.invoke(success, new TerraWebhookResponse(data, (String)null, (String)null, (String)null, (TerraUser)null, 30, (DefaultConstructorMarker)null), err);
+                     } else {
+                        TerraManager this_$iv = TerraManager.this;
+                        Intrinsics.checkNotNull(data);
+                        String var10000 = type.name().toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10000, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        String resource$iv = var10000;
+                        String datatype$iv = "sleep";
+                        Function3 var8 = completion;
+                        int $i$f$normalizeData = false;
+                        HTTPRequestClient.Builder var11 = new HTTPRequestClient.Builder();
+                        StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype$iv).append('/').append(resource$iv).append("?resource_user_id=").append(this_$iv.getUniqueId());
+                        Companion var10002 = TerraManager.Companion;
+                        String var10003 = resource$iv.toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        var11 = var11.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+                        Pair[] var10 = new Pair[]{TuplesKt.to("dev-id", this_$iv.devId)};
+                        var11.setHeaders1(MapsKt.hashMapOf(var10)).withOutput(data).withInput(TerraSleepDataPayload.class).build().getResponseFromRequest((Function1)(new TerraManager$getSleep$3$invoke$$inlined$normalizeData$1(var8, success)));
+                     }
+                  } else {
+                     completion.invoke(success, new TerraErrorResponse(data, (String)null, (String)null, 6, (DefaultConstructorMarker)null), err);
+                  }
+
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1, Object p2, Object p3) {
+                  this.invoke((Boolean)p1, (String)p2, (TerraError)p3);
+                  return Unit.INSTANCE;
+               }
+            }));
+            break;
+         default:
+            Log.e("TerraManager", "Resource does not support this datatype");
+            completion.invoke(false, (Object)null, new UnSupportedResource("Resource does not support this datatype"));
+      }
+
+   }
+
+   // $FF: synthetic method
+   public static void getSleep$default(TerraManager var0, Connections var1, Date var2, Date var3, boolean var4, Function3 var5, int var6, Object var7) {
+      if ((var6 & 8) != 0) {
+         var4 = true;
+      }
+
+      if ((var6 & 16) != 0) {
+         var5 = (Function3)null.INSTANCE;
+      }
+
+      var0.getSleep(var1, var2, var3, var4, var5);
+   }
+
+   public final void getBody(@NotNull Connections type, long startDate, long endDate, boolean toWebhook, @NotNull Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Date var10002 = Date.from(Instant.ofEpochSecond(startDate));
+      Intrinsics.checkNotNullExpressionValue(var10002, "from(Instant.ofEpochSecond(startDate))");
+      Date var10003 = Date.from(Instant.ofEpochSecond(endDate));
+      Intrinsics.checkNotNullExpressionValue(var10003, "from(Instant.ofEpochSecond(endDate))");
+      this.getBody(type, var10002, var10003, toWebhook, completion);
+   }
+
+   // $FF: synthetic method
+   public static void getBody$default(TerraManager var0, Connections var1, long var2, long var4, boolean var6, Function3 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var6 = true;
+      }
+
+      if ((var8 & 16) != 0) {
+         var7 = (Function3)null.INSTANCE;
+      }
+
+      var0.getBody(var1, var2, var4, var6, var7);
+   }
+
+   public final void getBody(@NotNull final Connections type, @NotNull Date startDate, @NotNull Date endDate, final boolean toWebhook, @NotNull final Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(startDate, "startDate");
+      Intrinsics.checkNotNullParameter(endDate, "endDate");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+         case 2:
+         case 3:
+            if (this.healthConnect == null) {
+               Log.e("TerraManager", "Terra not connected.");
+               completion.invoke(false, (Object)null, new Unauthorised("Not connected to Health Connect"));
+               return;
+            }
+
+            HealthConnect var10000 = this.healthConnect;
+            Intrinsics.checkNotNull(var10000);
+            var10000.getBody(type, startDate, endDate, false, toWebhook, (Function3)(new Function3() {
+               public final void invoke(boolean success, @Nullable String data, @Nullable TerraError err) {
+                  if (success) {
+                     if (toWebhook) {
+                        completion.invoke(success, new TerraWebhookResponse(data, (String)null, (String)null, (String)null, (TerraUser)null, 30, (DefaultConstructorMarker)null), err);
+                     } else {
+                        TerraManager this_$iv = TerraManager.this;
+                        Intrinsics.checkNotNull(data);
+                        String var10000 = type.name().toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10000, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        String resource$iv = var10000;
+                        String datatype$iv = "body";
+                        Function3 var8 = completion;
+                        int $i$f$normalizeData = false;
+                        HTTPRequestClient.Builder var11 = new HTTPRequestClient.Builder();
+                        StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype$iv).append('/').append(resource$iv).append("?resource_user_id=").append(this_$iv.getUniqueId());
+                        Companion var10002 = TerraManager.Companion;
+                        String var10003 = resource$iv.toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        var11 = var11.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+                        Pair[] var10 = new Pair[]{TuplesKt.to("dev-id", this_$iv.devId)};
+                        var11.setHeaders1(MapsKt.hashMapOf(var10)).withOutput(data).withInput(TerraBodyDataPayload.class).build().getResponseFromRequest((Function1)(new TerraManager$getBody$3$invoke$$inlined$normalizeData$1(var8, success)));
+                     }
+                  } else {
+                     completion.invoke(success, new TerraErrorResponse(data, (String)null, (String)null, 6, (DefaultConstructorMarker)null), err);
+                  }
+
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1, Object p2, Object p3) {
+                  this.invoke((Boolean)p1, (String)p2, (TerraError)p3);
+                  return Unit.INSTANCE;
+               }
+            }));
+            break;
+         default:
+            Log.e("TerraManager", "Resource does not support this datatype");
+            completion.invoke(false, (Object)null, new UnSupportedResource("Resource does not support this datatype"));
+      }
+
+   }
+
+   // $FF: synthetic method
+   public static void getBody$default(TerraManager var0, Connections var1, Date var2, Date var3, boolean var4, Function3 var5, int var6, Object var7) {
+      if ((var6 & 8) != 0) {
+         var4 = true;
+      }
+
+      if ((var6 & 16) != 0) {
+         var5 = (Function3)null.INSTANCE;
+      }
+
+      var0.getBody(var1, var2, var3, var4, var5);
+   }
+
+   public final void getActivity(@NotNull Connections type, long startDate, long endDate, boolean toWebhook, @NotNull Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Date var10002 = Date.from(Instant.ofEpochSecond(startDate));
+      Intrinsics.checkNotNullExpressionValue(var10002, "from(Instant.ofEpochSecond(startDate))");
+      Date var10003 = Date.from(Instant.ofEpochSecond(endDate));
+      Intrinsics.checkNotNullExpressionValue(var10003, "from(Instant.ofEpochSecond(endDate))");
+      this.getActivity(type, var10002, var10003, toWebhook, completion);
+   }
+
+   // $FF: synthetic method
+   public static void getActivity$default(TerraManager var0, Connections var1, long var2, long var4, boolean var6, Function3 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var6 = true;
+      }
+
+      if ((var8 & 16) != 0) {
+         var7 = (Function3)null.INSTANCE;
+      }
+
+      var0.getActivity(var1, var2, var4, var6, var7);
+   }
+
+   public final void getActivity(@NotNull final Connections type, @NotNull Date startDate, @NotNull Date endDate, final boolean toWebhook, @NotNull final Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(startDate, "startDate");
+      Intrinsics.checkNotNullParameter(endDate, "endDate");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+         case 2:
+         case 3:
+            if (this.healthConnect == null) {
+               Log.e("TerraManager", "Terra not connected.");
+               completion.invoke(false, (Object)null, new Unauthorised("Not connected to Health Connect"));
+               return;
+            }
+
+            HealthConnect var10000 = this.healthConnect;
+            Intrinsics.checkNotNull(var10000);
+            var10000.getActivity(type, startDate, endDate, false, toWebhook, (Function3)(new Function3() {
+               public final void invoke(boolean success, @Nullable String data, @Nullable TerraError err) {
+                  if (success) {
+                     if (toWebhook) {
+                        completion.invoke(success, new TerraWebhookResponse(data, (String)null, (String)null, (String)null, (TerraUser)null, 30, (DefaultConstructorMarker)null), err);
+                     } else {
+                        TerraManager this_$iv = TerraManager.this;
+                        Intrinsics.checkNotNull(data);
+                        String var10000 = type.name().toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10000, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        String resource$iv = var10000;
+                        String datatype$iv = "activity";
+                        Function3 var8 = completion;
+                        int $i$f$normalizeData = false;
+                        HTTPRequestClient.Builder var11 = new HTTPRequestClient.Builder();
+                        StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype$iv).append('/').append(resource$iv).append("?resource_user_id=").append(this_$iv.getUniqueId());
+                        Companion var10002 = TerraManager.Companion;
+                        String var10003 = resource$iv.toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        var11 = var11.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+                        Pair[] var10 = new Pair[]{TuplesKt.to("dev-id", this_$iv.devId)};
+                        var11.setHeaders1(MapsKt.hashMapOf(var10)).withOutput(data).withInput(TerraActivityDataPayload.class).build().getResponseFromRequest((Function1)(new TerraManager$getActivity$3$invoke$$inlined$normalizeData$1(var8, success)));
+                     }
+                  } else {
+                     completion.invoke(success, new TerraErrorResponse(data, (String)null, (String)null, 6, (DefaultConstructorMarker)null), err);
+                  }
+
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1, Object p2, Object p3) {
+                  this.invoke((Boolean)p1, (String)p2, (TerraError)p3);
+                  return Unit.INSTANCE;
+               }
+            }));
+            break;
+         default:
+            Log.e("TerraManager", "Resource does not support this datatype");
+            completion.invoke(false, (Object)null, new UnSupportedResource("Resource does not support this datatype"));
+      }
+
+   }
+
+   // $FF: synthetic method
+   public static void getActivity$default(TerraManager var0, Connections var1, Date var2, Date var3, boolean var4, Function3 var5, int var6, Object var7) {
+      if ((var6 & 8) != 0) {
+         var4 = true;
+      }
+
+      if ((var6 & 16) != 0) {
+         var5 = (Function3)null.INSTANCE;
+      }
+
+      var0.getActivity(var1, var2, var3, var4, var5);
+   }
+
+   public final void getAthlete(@NotNull Connections type, @NotNull Function1 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Log.e("TerraManager", "No supported providers");
+      completion.invoke(false);
+   }
+
+   // $FF: synthetic method
+   public static void getAthlete$default(TerraManager var0, Connections var1, Function1 var2, int var3, Object var4) {
+      if ((var3 & 2) != 0) {
+         var2 = (Function1)null.INSTANCE;
+      }
+
+      var0.getAthlete(var1, var2);
+   }
+
+   public final void getNutrition(@NotNull Connections type, long startDate, long endDate, boolean toWebhook, @NotNull Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Date var10002 = Date.from(Instant.ofEpochSecond(startDate));
+      Intrinsics.checkNotNullExpressionValue(var10002, "from(Instant.ofEpochSecond(startDate))");
+      Date var10003 = Date.from(Instant.ofEpochSecond(endDate));
+      Intrinsics.checkNotNullExpressionValue(var10003, "from(Instant.ofEpochSecond(endDate))");
+      this.getNutrition(type, var10002, var10003, toWebhook, completion);
+   }
+
+   // $FF: synthetic method
+   public static void getNutrition$default(TerraManager var0, Connections var1, long var2, long var4, boolean var6, Function3 var7, int var8, Object var9) {
+      if ((var8 & 8) != 0) {
+         var6 = true;
+      }
+
+      if ((var8 & 16) != 0) {
+         var7 = (Function3)null.INSTANCE;
+      }
+
+      var0.getNutrition(var1, var2, var4, var6, var7);
+   }
+
+   public final void getNutrition(@NotNull final Connections type, @NotNull Date startDate, @NotNull Date endDate, final boolean toWebhook, @NotNull final Function3 completion) {
+      Intrinsics.checkNotNullParameter(type, "type");
+      Intrinsics.checkNotNullParameter(startDate, "startDate");
+      Intrinsics.checkNotNullParameter(endDate, "endDate");
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[type.ordinal()]) {
+         case 1:
+         case 2:
+         case 3:
+            if (this.healthConnect == null) {
+               Log.e("TerraManager", "Terra not connected.");
+               completion.invoke(false, (Object)null, new Unauthorised("Not connected to Health Connect"));
+               return;
+            }
+
+            HealthConnect var10000 = this.healthConnect;
+            Intrinsics.checkNotNull(var10000);
+            var10000.getNutrition(type, startDate, endDate, false, toWebhook, (Function3)(new Function3() {
+               public final void invoke(boolean success, @Nullable String data, @Nullable TerraError err) {
+                  if (success) {
+                     if (toWebhook) {
+                        completion.invoke(success, new TerraWebhookResponse(data, (String)null, (String)null, (String)null, (TerraUser)null, 30, (DefaultConstructorMarker)null), err);
+                     } else {
+                        TerraManager this_$iv = TerraManager.this;
+                        Intrinsics.checkNotNull(data);
+                        String var10000 = type.name().toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10000, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        String resource$iv = var10000;
+                        String datatype$iv = "nutrition";
+                        Function3 var8 = completion;
+                        int $i$f$normalizeData = false;
+                        HTTPRequestClient.Builder var11 = new HTTPRequestClient.Builder();
+                        StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype$iv).append('/').append(resource$iv).append("?resource_user_id=").append(this_$iv.getUniqueId());
+                        Companion var10002 = TerraManager.Companion;
+                        String var10003 = resource$iv.toLowerCase(Locale.ROOT);
+                        Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+                        var11 = var11.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+                        Pair[] var10 = new Pair[]{TuplesKt.to("dev-id", this_$iv.devId)};
+                        var11.setHeaders1(MapsKt.hashMapOf(var10)).withOutput(data).withInput(TerraNutritionDataPayload.class).build().getResponseFromRequest((Function1)(new TerraManager$getNutrition$3$invoke$$inlined$normalizeData$1(var8, success)));
+                     }
+                  } else {
+                     completion.invoke(success, new TerraErrorResponse(data, (String)null, (String)null, 6, (DefaultConstructorMarker)null), err);
+                  }
+
+               }
+
+               // $FF: synthetic method
+               // $FF: bridge method
+               public Object invoke(Object p1, Object p2, Object p3) {
+                  this.invoke((Boolean)p1, (String)p2, (TerraError)p3);
+                  return Unit.INSTANCE;
+               }
+            }));
+            break;
+         default:
+            completion.invoke(false, (Object)null, new UnSupportedResource("Resource does not support this datatype"));
+      }
+
+   }
+
+   // $FF: synthetic method
+   public static void getNutrition$default(TerraManager var0, Connections var1, Date var2, Date var3, boolean var4, Function3 var5, int var6, Object var7) {
+      if ((var6 & 8) != 0) {
+         var4 = true;
+      }
+
+      if ((var6 & 16) != 0) {
+         var5 = (Function3)null.INSTANCE;
+      }
+
+      var0.getNutrition(var1, var2, var3, var4, var5);
+   }
+
+   public final void readGlucoseData(@NotNull Function1 completion) {
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      Log.d("TerraManager", "Reading Glucose data");
+      if (!this.preferences.getBoolean("co.tryterra.terra.fslsdk", false)) {
+         Log.e("TerraManager", "FSL has not yet been enabled. Did you call initConnection with FSL yet?");
+         completion.invoke((Object)null);
+      } else {
+         FSLSensor.setDataConsumer(TerraManager::readGlucoseData$lambda-10);
+         Intent fslSensorIntent = new Intent(this.context, FSLSensor.class);
+         fslSensorIntent.addFlags(536870912);
+         this.context.startActivity(fslSensorIntent);
+         Log.d("TerraManager", "Finished initialising glucose data read");
+      }
+   }
+
+   public final void subscribe(@NotNull Set forDataTypes) {
+      Intrinsics.checkNotNullParameter(forDataTypes, "forDataTypes");
+      if (Terra.Companion.getUpdateHandler() == null) {
+         throw new NoUpdateHandlerDetected("Please set an update handler first");
+      } else if (this.healthConnect == null) {
+         throw new NotAuthenticated("Please authenticate with Samsung Health or Google Fit for this feature");
+      } else {
+         SharedPreferences.Editor var10000 = this.preferences.edit();
+         Iterable $this$map$iv = (Iterable)forDataTypes;
+         String var12 = "co.tryterra.subscribed.types.google.fit";
+         SharedPreferences.Editor var11 = var10000;
+         int $i$f$map = false;
+         Collection destination$iv$iv = (Collection)(new ArrayList(CollectionsKt.collectionSizeOrDefault($this$map$iv, 10)));
+         int $i$f$mapTo = false;
+         Iterator var7 = $this$map$iv.iterator();
+
+         while(var7.hasNext()) {
+            Object item$iv$iv = var7.next();
+            DataTypes it = (DataTypes)item$iv$iv;
+            int var10 = false;
+            destination$iv$iv.add(it.name());
+         }
+
+         List var13 = (List)destination$iv$iv;
+         var11.putStringSet(var12, CollectionsKt.toSet((Iterable)var13)).apply();
+         Set dataTypesToStream = CollectionsKt.toMutableSet((Iterable)forDataTypes);
+         if (forDataTypes.contains(DataTypes.STEPS)) {
+            WorkManager var19 = WorkManager.getInstance(this.context);
+            Intrinsics.checkNotNullExpressionValue(var19, "getInstance(this.context)");
+            WorkManager workManager = var19;
+            long repeatInterval$iv = 900000L;
+            TimeUnit repeatIntervalTimeUnit$iv = TimeUnit.MILLISECONDS;
+            int $i$f$PeriodicWorkRequestBuilder = false;
+            PeriodicWorkRequest periodicTrigger = (PeriodicWorkRequest)(new PeriodicWorkRequest.Builder(StepWorker.class, repeatInterval$iv, repeatIntervalTimeUnit$iv)).build();
+            workManager.enqueueUniquePeriodicWork("co.tryterra.sensor.steps.update", ExistingPeriodicWorkPolicy.REPLACE, periodicTrigger);
+            dataTypesToStream.remove(DataTypes.STEPS);
+         }
+
+      }
+   }
+
+   public final void allGivenPermissions(@NotNull Function1 completion) {
+      Intrinsics.checkNotNullParameter(completion, "completion");
+      HealthConnect var10000 = this.healthConnect;
+      if (var10000 != null) {
+         var10000.getAllPermissions(completion);
+      }
+
+   }
+
+   // $FF: synthetic method
+   private final void normalizeData(String data, String resource, String datatype, final Function2 completion) {
+      int $i$f$normalizeData = false;
+      HTTPRequestClient.Builder var10000 = new HTTPRequestClient.Builder();
+      StringBuilder var10001 = (new StringBuilder()).append("https://api.tryterra.co/v2/normalize/").append(datatype).append('/').append(resource).append("?resource_user_id=").append(access$getUniqueId(this));
+      Companion var10002 = Companion;
+      String var10003 = resource.toLowerCase(Locale.ROOT);
+      Intrinsics.checkNotNullExpressionValue(var10003, "this as java.lang.String).toLowerCase(Locale.ROOT)");
+      var10000 = var10000.setUrl(var10001.append(var10002.resourceToIdEndings(var10003)).toString());
+      Pair[] var6 = new Pair[]{TuplesKt.to("dev-id", access$getDevId$p(this))};
+      var10000 = var10000.setHeaders1(MapsKt.hashMapOf(var6)).withOutput(data);
+      Intrinsics.reifiedOperationMarker(4, "T");
+      HTTPRequestClient var7 = var10000.withInput((Class)Object.class).build();
+      Intrinsics.needClassReification();
+      var7.getResponseFromRequest((Function1)(new Function1() {
+         public final void invoke(@Nullable Object it) {
+            try {
+               Function2 var10000 = completion;
+               Intrinsics.reifiedOperationMarker(1, "T");
+               var10000.invoke((Object)it, (Object)null);
+            } catch (ClassCastException var3) {
+               completion.invoke((Object)null, new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+            } catch (NullPointerException var4) {
+               completion.invoke((Object)null, new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+            }
+
+         }
+
+         // $FF: synthetic method
+         // $FF: bridge method
+         public Object invoke(Object p1) {
+            this.invoke(p1);
+            return Unit.INSTANCE;
+         }
+      }));
+   }
+
+   public final void checkAuth(@NotNull Connections connection, @NotNull final Function1 callback) {
+      Intrinsics.checkNotNullParameter(connection, "connection");
+      Intrinsics.checkNotNullParameter(callback, "callback");
+      String var10000;
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[connection.ordinal()]) {
+         case 1:
+            var10000 = "gsdk";
+            break;
+         case 2:
+            var10000 = "";
+            break;
+         case 3:
+            var10000 = "hc";
+            break;
+         case 4:
+            var10000 = "sfsl";
+            break;
+         default:
+            throw new NoWhenBranchMatchedException();
+      }
+
+      String prefix = var10000;
+      switch (TerraManager.WhenMappings.$EnumSwitchMapping$0[connection.ordinal()]) {
+         case 1:
+            var10000 = "googlefit";
+            break;
+         case 2:
+            var10000 = "samsung";
+            break;
+         case 3:
+            var10000 = "health_connect";
+            break;
+         case 4:
+            var10000 = "freestylelibresdk";
+            break;
+         default:
+            throw new NoWhenBranchMatchedException();
+      }
+
+      String resource = var10000;
+      HTTPRequestClient.Builder var6 = (new HTTPRequestClient.Builder()).setUrl("https://api.tryterra.co/v2/auth/" + resource + "/check_auth?resource_user_identifier=" + this.getUniqueId() + prefix).method("POST");
+      Pair[] var5 = new Pair[]{TuplesKt.to("dev-id", this.devId)};
+      var6.setHeaders1(MapsKt.hashMapOf(var5)).withInput(BaseResponse.class).build().getResponseFromRequest((Function1)(new Function1() {
+         public final void invoke(@Nullable Object it) {
+            BaseResponse resp = it instanceof BaseResponse ? (BaseResponse)it : null;
+            if (Intrinsics.areEqual(resp != null ? resp.getStatus() : null, "success")) {
+               callback.invoke(true);
+            } else {
+               callback.invoke(false);
+            }
+
+         }
+
+         // $FF: synthetic method
+         // $FF: bridge method
+         public Object invoke(Object p1) {
+            this.invoke(p1);
+            return Unit.INSTANCE;
+         }
+      }));
+   }
+
+   private static final void _init_$lambda_0/* $FF was: _init_$lambda-0*/(TerraManager this$0, Set res) {
+      Intrinsics.checkNotNullParameter(this$0, "this$0");
+      Companion var10000 = Companion;
+      Intrinsics.checkNotNullExpressionValue(res, "res");
+      grantedPermissions = res;
+      HealthConnect.Companion.permissionCallback(this$0.healthConnect);
+   }
+
+   private static final Set initHealthConnect$lambda_2/* $FF was: initHealthConnect$lambda-2*/(Set t, Set u) {
+      Intrinsics.checkNotNullExpressionValue(t, "t");
+      Iterable var10000 = (Iterable)t;
+      Intrinsics.checkNotNullExpressionValue(u, "u");
+      return CollectionsKt.union(var10000, (Iterable)u);
+   }
+
+   private static final Set initHealthConnect$lambda_3/* $FF was: initHealthConnect$lambda-3*/(CustomPermissions it) {
+      return it.correspondingHealthConnectPermissions();
+   }
+
+   private static final Set initHealthConnect$lambda_4/* $FF was: initHealthConnect$lambda-4*/(Set t, Set u) {
+      Intrinsics.checkNotNullExpressionValue(t, "t");
+      Iterable var10000 = (Iterable)t;
+      Intrinsics.checkNotNullExpressionValue(u, "u");
+      return CollectionsKt.union(var10000, (Iterable)u);
+   }
+
+   private static final void readGlucoseData$lambda_10/* $FF was: readGlucoseData$lambda-10*/(Function1 $tmp0, FSLSensorDetails p0) {
+      Intrinsics.checkNotNullParameter($tmp0, "$tmp0");
+      $tmp0.invoke(p0);
+   }
+
+   // $FF: synthetic method
+   public TerraManager(String devId, Context context, String referenceId, Function2 completion, DefaultConstructorMarker $constructor_marker) {
+      this(devId, context, referenceId, completion);
+   }
+
+   static {
+      permissionLauncher = androidx.health.connect.client.PermissionController.Companion.createRequestPermissionResultContract$default(PermissionController.Companion, (String)null, 1, (Object)null);
+      grantedPermissions = SetsKt.emptySet();
+   }
+
+   @Metadata(
+      mv = {1, 7, 1},
+      k = 1,
+      xi = 48,
+      d1 = {"\u0000\"\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\u000e\n\u0002\b\t\n\u0002\u0010\u000b\n\u0002\b\u0002\n\u0002\u0010\b\n\u0002\b\u0002\b\u0080\b\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\b\u0010\u0004\u001a\u0004\u0018\u00010\u0003¢\u0006\u0002\u0010\u0005J\t\u0010\t\u001a\u00020\u0003HÆ\u0003J\u000b\u0010\n\u001a\u0004\u0018\u00010\u0003HÆ\u0003J\u001f\u0010\u000b\u001a\u00020\u00002\b\b\u0002\u0010\u0002\u001a\u00020\u00032\n\b\u0002\u0010\u0004\u001a\u0004\u0018\u00010\u0003HÆ\u0001J\u0013\u0010\f\u001a\u00020\r2\b\u0010\u000e\u001a\u0004\u0018\u00010\u0001HÖ\u0003J\t\u0010\u000f\u001a\u00020\u0010HÖ\u0001J\t\u0010\u0011\u001a\u00020\u0003HÖ\u0001R\u0013\u0010\u0004\u001a\u0004\u0018\u00010\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0006\u0010\u0007R\u0011\u0010\u0002\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\b\u0010\u0007¨\u0006\u0012"},
+      d2 = {"Lco/tryterra/terra/TerraManager$BaseResponse;", "", "status", "", "message", "(Ljava/lang/String;Ljava/lang/String;)V", "getMessage", "()Ljava/lang/String;", "getStatus", "component1", "component2", "copy", "equals", "", "other", "hashCode", "", "toString", "TerraAndroid_release"}
+   )
+   public static final class BaseResponse {
+      @NotNull
+      private final String status;
+      @Nullable
+      private final String message;
+
+      public BaseResponse(@NotNull String status, @Nullable String message) {
+         Intrinsics.checkNotNullParameter(status, "status");
+         super();
+         this.status = status;
+         this.message = message;
+      }
+
+      @NotNull
+      public final String getStatus() {
+         return this.status;
+      }
+
+      @Nullable
+      public final String getMessage() {
+         return this.message;
+      }
+
+      @NotNull
+      public final String component1() {
+         return this.status;
+      }
+
+      @Nullable
+      public final String component2() {
+         return this.message;
+      }
+
+      @NotNull
+      public final BaseResponse copy(@NotNull String status, @Nullable String message) {
+         Intrinsics.checkNotNullParameter(status, "status");
+         return new BaseResponse(status, message);
+      }
+
+      // $FF: synthetic method
+      public static BaseResponse copy$default(BaseResponse var0, String var1, String var2, int var3, Object var4) {
+         if ((var3 & 1) != 0) {
+            var1 = var0.status;
+         }
+
+         if ((var3 & 2) != 0) {
+            var2 = var0.message;
+         }
+
+         return var0.copy(var1, var2);
+      }
+
+      @NotNull
+      public String toString() {
+         return "BaseResponse(status=" + this.status + ", message=" + this.message + ')';
+      }
+
+      public int hashCode() {
+         int result = this.status.hashCode();
+         result = result * 31 + (this.message == null ? 0 : this.message.hashCode());
+         return result;
+      }
+
+      public boolean equals(@Nullable Object other) {
+         if (this == other) {
+            return true;
+         } else if (!(other instanceof BaseResponse)) {
+            return false;
+         } else {
+            BaseResponse var2 = (BaseResponse)other;
+            if (!Intrinsics.areEqual(this.status, var2.status)) {
+               return false;
+            } else {
+               return Intrinsics.areEqual(this.message, var2.message);
+            }
+         }
+      }
+   }
+
+   @Metadata(
+      mv = {1, 7, 1},
+      k = 1,
+      xi = 48,
+      d1 = {"\u0000\\\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\n\u0002\u0010\u000e\n\u0002\b\u0002\n\u0002\u0010\"\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0010\u000b\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\b\u0006\b\u0086\u0003\u0018\u00002\u00020\u0001B\u0007\b\u0002¢\u0006\u0002\u0010\u0002JC\u0010\u001d\u001a\u00020\u001e2\u0006\u0010\u001f\u001a\u00020\u00042\u0006\u0010 \u001a\u00020!2\b\u0010\"\u001a\u0004\u0018\u00010\u00042\u001a\u0010#\u001a\u0016\u0012\u0004\u0012\u00020%\u0012\u0006\u0012\u0004\u0018\u00010&\u0012\u0004\u0012\u00020'0$H\u0000¢\u0006\u0002\b(J\u000e\u0010)\u001a\u00020\u00042\u0006\u0010*\u001a\u00020\u0004J\u000e\u0010+\u001a\u00020\u00042\u0006\u0010,\u001a\u00020\u0004R\u000e\u0010\u0003\u001a\u00020\u0004X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u0005\u001a\u00020\u0004X\u0080T¢\u0006\u0002\n\u0000R \u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\u00040\u0007X\u0080\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\b\u0010\t\"\u0004\b\n\u0010\u000bR,\u0010\f\u001a\u001a\u0012\n\u0012\b\u0012\u0004\u0012\u00020\u00040\u0007\u0012\n\u0012\b\u0012\u0004\u0012\u00020\u00040\u00070\rX\u0080\u0004¢\u0006\b\n\u0000\u001a\u0004\b\u000e\u0010\u000fR\u001a\u0010\u0010\u001a\u00020\u0011X\u0086\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0012\u0010\u0013\"\u0004\b\u0014\u0010\u0015R \u0010\u0016\u001a\b\u0012\u0004\u0012\u00020\u00180\u0017X\u0080\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0019\u0010\u001a\"\u0004\b\u001b\u0010\u001c¨\u0006-"},
+      d2 = {"Lco/tryterra/terra/TerraManager$Companion;", "", "()V", "TAG", "", "TERRA_PREFS", "grantedPermissions", "", "getGrantedPermissions$TerraAndroid_release", "()Ljava/util/Set;", "setGrantedPermissions$TerraAndroid_release", "(Ljava/util/Set;)V", "permissionLauncher", "Landroidx/activity/result/contract/ActivityResultContract;", "getPermissionLauncher$TerraAndroid_release", "()Landroidx/activity/result/contract/ActivityResultContract;", "sensorScanning", "Ljava/util/concurrent/atomic/AtomicBoolean;", "getSensorScanning", "()Ljava/util/concurrent/atomic/AtomicBoolean;", "setSensorScanning", "(Ljava/util/concurrent/atomic/AtomicBoolean;)V", "users", "Ljava/util/ArrayList;", "Lco/tryterra/terra/models/Users;", "getUsers$TerraAndroid_release", "()Ljava/util/ArrayList;", "setUsers$TerraAndroid_release", "(Ljava/util/ArrayList;)V", "createInstance", "Lco/tryterra/terra/TerraManager;", "devId", "context", "Landroid/content/Context;", "referenceId", "completion", "Lkotlin/Function2;", "", "Lco/tryterra/terra/TerraError;", "", "createInstance$TerraAndroid_release", "resourceToIdEndings", "resource", "uniqueIdEndings", "packageName", "TerraAndroid_release"}
+   )
+   public static final class Companion {
+      private Companion() {
+      }
+
+      @NotNull
+      public final ArrayList getUsers$TerraAndroid_release() {
+         return TerraManager.users;
+      }
+
+      public final void setUsers$TerraAndroid_release(@NotNull ArrayList var1) {
+         Intrinsics.checkNotNullParameter(var1, "<set-?>");
+         TerraManager.users = var1;
+      }
+
+      @NotNull
+      public final AtomicBoolean getSensorScanning() {
+         return TerraManager.sensorScanning;
+      }
+
+      public final void setSensorScanning(@NotNull AtomicBoolean var1) {
+         Intrinsics.checkNotNullParameter(var1, "<set-?>");
+         TerraManager.sensorScanning = var1;
+      }
+
+      @NotNull
+      public final ActivityResultContract getPermissionLauncher$TerraAndroid_release() {
+         return TerraManager.permissionLauncher;
+      }
+
+      @NotNull
+      public final Set getGrantedPermissions$TerraAndroid_release() {
+         return TerraManager.grantedPermissions;
+      }
+
+      public final void setGrantedPermissions$TerraAndroid_release(@NotNull Set var1) {
+         Intrinsics.checkNotNullParameter(var1, "<set-?>");
+         TerraManager.grantedPermissions = var1;
+      }
+
+      @NotNull
+      public final TerraManager createInstance$TerraAndroid_release(@NotNull String devId, @NotNull Context context, @Nullable String referenceId, @NotNull Function2 completion) {
+         Intrinsics.checkNotNullParameter(devId, "devId");
+         Intrinsics.checkNotNullParameter(context, "context");
+         Intrinsics.checkNotNullParameter(completion, "completion");
+         return new TerraManager(devId, context, referenceId, completion, (DefaultConstructorMarker)null);
+      }
+
+      @NotNull
+      public final String uniqueIdEndings(@NotNull String packageName) {
+         Intrinsics.checkNotNullParameter(packageName, "packageName");
+         return Intrinsics.areEqual(packageName, "com.google.android.apps.fitness") ? "gsdk" : (Intrinsics.areEqual(packageName, "com.google.android.apps.healthdata") ? "hc" : "");
+      }
+
+      @NotNull
+      public final String resourceToIdEndings(@NotNull String resource) {
+         Intrinsics.checkNotNullParameter(resource, "resource");
+         String var10000;
+         switch (resource) {
+            case "freestylelibresdk":
+               var10000 = "sfsl";
+               return var10000;
+            case "health_connect":
+               var10000 = "hc";
+               return var10000;
+            case "googlefit":
+               var10000 = "gsdk";
+               return var10000;
+            case "samsung":
+               var10000 = "";
+               return var10000;
+         }
+
+         var10000 = "";
+         return var10000;
+      }
+
+      // $FF: synthetic method
+      public Companion(DefaultConstructorMarker $constructor_marker) {
+         this();
+      }
+   }
+
+   // $FF: synthetic class
+   @Metadata(
+      mv = {1, 7, 1},
+      k = 3,
+      xi = 48
+   )
+   public class WhenMappings {
+      // $FF: synthetic field
+      public static final int[] $EnumSwitchMapping$0;
+
+      static {
+         int[] var0 = new int[Connections.values().length];
+         var0[Connections.GOOGLE_FIT.ordinal()] = 1;
+         var0[Connections.SAMSUNG.ordinal()] = 2;
+         var0[Connections.HEALTH_CONNECT.ordinal()] = 3;
+         var0[Connections.FREESTYLE_LIBRE.ordinal()] = 4;
+         $EnumSwitchMapping$0 = var0;
+      }
+   }
+}
+// TerraManager$getBody$3$invoke$$inlined$normalizeData$1.java
+package co.tryterra.terra;
+
+import co.tryterra.terra.backend.models.TerraBodyDataPayload;
+import kotlin.Metadata;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.Lambda;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 3,
+   xi = 48,
+   d1 = {"\u0000\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\u0010\u0000\u001a\u00020\u0001\"\u0006\b\u0000\u0010\u0002\u0018\u00012\b\u0010\u0003\u001a\u0004\u0018\u00010\u0004H\n¢\u0006\u0002\b\u0005¨\u0006\u0006"},
+   d2 = {"<anonymous>", "", "T", "it", "", "invoke", "co/tryterra/terra/TerraManager$normalizeData$1"}
+)
+public final class TerraManager$getBody$3$invoke$$inlined$normalizeData$1 extends Lambda implements Function1 {
+   // $FF: synthetic field
+   final Function3 $completion$inlined;
+   // $FF: synthetic field
+   final boolean $success$inlined;
+
+   public TerraManager$getBody$3$invoke$$inlined$normalizeData$1(Function3 var1, boolean var2) {
+      super(1);
+      this.$completion$inlined = var1;
+      this.$success$inlined = var2;
+   }
+
+   public final void invoke(@Nullable Object it) {
+      TerraBodyDataPayload _data;
+      TerraError _err;
+      boolean var5;
+      try {
+         if (it == null) {
+            throw new NullPointerException("null cannot be cast to non-null type co.tryterra.terra.backend.models.TerraBodyDataPayload");
+         }
+
+         TerraBodyDataPayload var10000 = (TerraBodyDataPayload)it;
+         TerraError _err = (TerraError)null;
+         TerraBodyDataPayload _data = var10000;
+         int var9 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (ClassCastException var6) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraBodyDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (NullPointerException var7) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraBodyDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      }
+
+   }
+
+   // $FF: synthetic method
+   // $FF: bridge method
+   public Object invoke(Object p1) {
+      this.invoke(p1);
+      return Unit.INSTANCE;
+   }
+}
+// TerraManager$getDaily$3$invoke$$inlined$normalizeData$1.java
+package co.tryterra.terra;
+
+import co.tryterra.terra.backend.models.TerraDailyDataPayload;
+import kotlin.Metadata;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.Lambda;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 3,
+   xi = 48,
+   d1 = {"\u0000\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\u0010\u0000\u001a\u00020\u0001\"\u0006\b\u0000\u0010\u0002\u0018\u00012\b\u0010\u0003\u001a\u0004\u0018\u00010\u0004H\n¢\u0006\u0002\b\u0005¨\u0006\u0006"},
+   d2 = {"<anonymous>", "", "T", "it", "", "invoke", "co/tryterra/terra/TerraManager$normalizeData$1"}
+)
+public final class TerraManager$getDaily$3$invoke$$inlined$normalizeData$1 extends Lambda implements Function1 {
+   // $FF: synthetic field
+   final Function3 $completion$inlined;
+   // $FF: synthetic field
+   final boolean $success$inlined;
+
+   public TerraManager$getDaily$3$invoke$$inlined$normalizeData$1(Function3 var1, boolean var2) {
+      super(1);
+      this.$completion$inlined = var1;
+      this.$success$inlined = var2;
+   }
+
+   public final void invoke(@Nullable Object it) {
+      TerraDailyDataPayload _data;
+      TerraError _err;
+      boolean var5;
+      try {
+         if (it == null) {
+            throw new NullPointerException("null cannot be cast to non-null type co.tryterra.terra.backend.models.TerraDailyDataPayload");
+         }
+
+         TerraDailyDataPayload var10000 = (TerraDailyDataPayload)it;
+         TerraError _err = (TerraError)null;
+         TerraDailyDataPayload _data = var10000;
+         int var9 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (ClassCastException var6) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraDailyDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (NullPointerException var7) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraDailyDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      }
+
+   }
+
+   // $FF: synthetic method
+   // $FF: bridge method
+   public Object invoke(Object p1) {
+      this.invoke(p1);
+      return Unit.INSTANCE;
+   }
+}
+// TerraManager$getSleep$3$invoke$$inlined$normalizeData$1.java
+package co.tryterra.terra;
+
+import co.tryterra.terra.backend.models.TerraSleepDataPayload;
+import kotlin.Metadata;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.Lambda;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 3,
+   xi = 48,
+   d1 = {"\u0000\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\u0010\u0000\u001a\u00020\u0001\"\u0006\b\u0000\u0010\u0002\u0018\u00012\b\u0010\u0003\u001a\u0004\u0018\u00010\u0004H\n¢\u0006\u0002\b\u0005¨\u0006\u0006"},
+   d2 = {"<anonymous>", "", "T", "it", "", "invoke", "co/tryterra/terra/TerraManager$normalizeData$1"}
+)
+public final class TerraManager$getSleep$3$invoke$$inlined$normalizeData$1 extends Lambda implements Function1 {
+   // $FF: synthetic field
+   final Function3 $completion$inlined;
+   // $FF: synthetic field
+   final boolean $success$inlined;
+
+   public TerraManager$getSleep$3$invoke$$inlined$normalizeData$1(Function3 var1, boolean var2) {
+      super(1);
+      this.$completion$inlined = var1;
+      this.$success$inlined = var2;
+   }
+
+   public final void invoke(@Nullable Object it) {
+      TerraSleepDataPayload _data;
+      TerraError _err;
+      boolean var5;
+      try {
+         if (it == null) {
+            throw new NullPointerException("null cannot be cast to non-null type co.tryterra.terra.backend.models.TerraSleepDataPayload");
+         }
+
+         TerraSleepDataPayload var10000 = (TerraSleepDataPayload)it;
+         TerraError _err = (TerraError)null;
+         TerraSleepDataPayload _data = var10000;
+         int var9 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (ClassCastException var6) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraSleepDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (NullPointerException var7) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraSleepDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      }
+
+   }
+
+   // $FF: synthetic method
+   // $FF: bridge method
+   public Object invoke(Object p1) {
+      this.invoke(p1);
+      return Unit.INSTANCE;
+   }
+}
+// TerraManager$getActivity$3$invoke$$inlined$normalizeData$1.java
+package co.tryterra.terra;
+
+import co.tryterra.terra.backend.models.TerraActivityDataPayload;
+import kotlin.Metadata;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.Lambda;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 3,
+   xi = 48,
+   d1 = {"\u0000\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\u0010\u0000\u001a\u00020\u0001\"\u0006\b\u0000\u0010\u0002\u0018\u00012\b\u0010\u0003\u001a\u0004\u0018\u00010\u0004H\n¢\u0006\u0002\b\u0005¨\u0006\u0006"},
+   d2 = {"<anonymous>", "", "T", "it", "", "invoke", "co/tryterra/terra/TerraManager$normalizeData$1"}
+)
+public final class TerraManager$getActivity$3$invoke$$inlined$normalizeData$1 extends Lambda implements Function1 {
+   // $FF: synthetic field
+   final Function3 $completion$inlined;
+   // $FF: synthetic field
+   final boolean $success$inlined;
+
+   public TerraManager$getActivity$3$invoke$$inlined$normalizeData$1(Function3 var1, boolean var2) {
+      super(1);
+      this.$completion$inlined = var1;
+      this.$success$inlined = var2;
+   }
+
+   public final void invoke(@Nullable Object it) {
+      TerraActivityDataPayload _data;
+      TerraError _err;
+      boolean var5;
+      try {
+         if (it == null) {
+            throw new NullPointerException("null cannot be cast to non-null type co.tryterra.terra.backend.models.TerraActivityDataPayload");
+         }
+
+         TerraActivityDataPayload var10000 = (TerraActivityDataPayload)it;
+         TerraError _err = (TerraError)null;
+         TerraActivityDataPayload _data = var10000;
+         int var9 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (ClassCastException var6) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraActivityDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (NullPointerException var7) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraActivityDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      }
+
+   }
+
+   // $FF: synthetic method
+   // $FF: bridge method
+   public Object invoke(Object p1) {
+      this.invoke(p1);
+      return Unit.INSTANCE;
+   }
+}
+// TerraManager$getNutrition$3$invoke$$inlined$normalizeData$1.java
+package co.tryterra.terra;
+
+import co.tryterra.terra.backend.models.TerraNutritionDataPayload;
+import kotlin.Metadata;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
+import kotlin.jvm.functions.Function3;
+import kotlin.jvm.internal.Lambda;
+import org.jetbrains.annotations.Nullable;
+
+@Metadata(
+   mv = {1, 7, 1},
+   k = 3,
+   xi = 48,
+   d1 = {"\u0000\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0002\b\u0002\u0010\u0000\u001a\u00020\u0001\"\u0006\b\u0000\u0010\u0002\u0018\u00012\b\u0010\u0003\u001a\u0004\u0018\u00010\u0004H\n¢\u0006\u0002\b\u0005¨\u0006\u0006"},
+   d2 = {"<anonymous>", "", "T", "it", "", "invoke", "co/tryterra/terra/TerraManager$normalizeData$1"}
+)
+public final class TerraManager$getNutrition$3$invoke$$inlined$normalizeData$1 extends Lambda implements Function1 {
+   // $FF: synthetic field
+   final Function3 $completion$inlined;
+   // $FF: synthetic field
+   final boolean $success$inlined;
+
+   public TerraManager$getNutrition$3$invoke$$inlined$normalizeData$1(Function3 var1, boolean var2) {
+      super(1);
+      this.$completion$inlined = var1;
+      this.$success$inlined = var2;
+   }
+
+   public final void invoke(@Nullable Object it) {
+      TerraNutritionDataPayload _data;
+      TerraError _err;
+      boolean var5;
+      try {
+         if (it == null) {
+            throw new NullPointerException("null cannot be cast to non-null type co.tryterra.terra.backend.models.TerraNutritionDataPayload");
+         }
+
+         TerraNutritionDataPayload var10000 = (TerraNutritionDataPayload)it;
+         TerraError _err = (TerraError)null;
+         TerraNutritionDataPayload _data = var10000;
+         int var9 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (ClassCastException var6) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraNutritionDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      } catch (NullPointerException var7) {
+         _err = (TerraError)(new UnexpectedError("Unexpected Error occurred while parsing data from server"));
+         _data = (TerraNutritionDataPayload)null;
+         var5 = false;
+         this.$completion$inlined.invoke(this.$success$inlined, _data, _err);
+      }
+
+   }
+
+   // $FF: synthetic method
+   // $FF: bridge method
+   public Object invoke(Object p1) {
+      this.invoke(p1);
+      return Unit.INSTANCE;
+   }
+}

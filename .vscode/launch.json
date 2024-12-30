@@ -1,0 +1,72 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "vizzhy-customer-app (dev)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_dev.dart",
+        "args": [
+          "--flavor",
+          "dev"
+        ],
+        "flutterMode": "debug"
+      },
+      {
+        "name": "vizzhy-customer-app (prod)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_prod.dart",
+        "args": [
+          "--flavor",
+          "prod"
+        ],
+        "flutterMode": "debug"
+      },
+      {
+        "name": "vizzhy-customer-app (profile mode - prod)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_prod.dart",
+        "args": [
+          "--flavor",
+          "prod"
+        ],
+        "flutterMode": "profile"
+      },
+      {
+        "name": "vizzhy-customer-app (release mode - prod)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_prod.dart",
+        "args": [
+          "--flavor",
+          "prod"
+        ],
+        "flutterMode": "release"
+      },
+      {
+        "name": "vizzhy-customer-app (profile mode - dev)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_dev.dart",
+        "args": [
+          "--flavor",
+          "dev"
+        ],
+        "flutterMode": "profile"
+      },
+      {
+        "name": "vizzhy-customer-app (release mode - dev)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main_dev.dart",
+        "args": [
+          "--flavor",
+          "dev"
+        ],
+        "flutterMode": "release"
+      }
+    ]
+  }
+  

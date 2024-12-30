@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "315546812604",
+    "project_id": "vizzhystag-bcb4e",
+    "storage_bucket": "vizzhystag-bcb4e.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315546812604:android:06ac4755cd6b1d5eeed0b9",
+        "android_client_info": {
+          "package_name": "com.vizzhy.multiomics"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArqpXRHykSuwrWIDixUWtXQtBIDneensQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

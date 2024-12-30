@@ -1,0 +1,17 @@
+flavors:
+  dev:
+    app:
+      name: "Opti Care Dev"
+
+    android:
+      applicationId: "com.vizzhy.iottest"  
+    ios:
+      bundleId: "com.vizzhy.iottest"
+  prod:
+    app:
+      name: "Opti Care"
+
+    android:
+      applicationId: "com.vizzhy.multiomics"
+    ios:
+      bundleId: "com.vizzhy.multiomics"
